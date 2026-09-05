@@ -1,0 +1,48 @@
+services:
+  localstack:
+    image: localstack/localstack:3.8
+    container_name: cloud-control-plane-localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3
+      - DEBUG=0
+      - DEFAULT_REGION=us-east-1
+      - PERSISTENCE=0
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "http://localhost:4566/_localstack/health",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  api:
+    build:
+      context: .
+    container_name: cloud-control-plane-api
+    ports:
+      - "8000:8000"
+    environment:
+      - CLOUD_PROVIDER=localstack
+      - AWS_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_ENDPOINT_URL=http://localstack:4566
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./app:/app/app
+    depends_on:
+      localstack:
+        condition: service_healthy
+
+volumes:
+  localstack_data:
