@@ -10,19 +10,22 @@ directly (see Phase Plan section 14, "Error Model"):
     403              -> permission problem
     timeout          -> retry + diagnostic info
 """
+
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from botocore.exceptions import (
     BotoCoreError,
     ClientError,
-    ConnectionError as BotoConnectionError,
     EndpointConnectionError,
+)
+from botocore.exceptions import (
+    ConnectionError as BotoConnectionError,
 )
 
 
-class ErrorCode(str, Enum):
+class ErrorCode(StrEnum):
     VALIDATION_ERROR = "VALIDATION_ERROR"
     RESOURCE_NOT_FOUND = "RESOURCE_NOT_FOUND"
     RESOURCE_ALREADY_EXISTS = "RESOURCE_ALREADY_EXISTS"

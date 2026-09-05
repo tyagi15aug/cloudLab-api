@@ -5,6 +5,7 @@ exception types or know an AWS error code like "BucketAlreadyExists" exists
 — routes call this service, this service calls the CloudProvider, and every
 boto3/botocore detail is translated or absorbed before it goes back up.
 """
+
 from __future__ import annotations
 
 import base64
@@ -13,7 +14,7 @@ from datetime import datetime
 
 from botocore.exceptions import BotoCoreError, ClientError
 
-from app.core.errors import ErrorCode, AppError, translate_boto_error
+from app.core.errors import AppError, ErrorCode, translate_boto_error
 from app.core.logging import elapsed_ms, log_operation, timed_ms
 from app.models.resource import BucketResource
 from app.providers.base import CloudProvider
@@ -168,10 +169,10 @@ def _decode_cursor(cursor: str | None) -> int:
         return 0
     try:
         return max(0, int(base64.urlsafe_b64decode(cursor.encode()).decode()))
-    except (ValueError, UnicodeDecodeError):
+    except (ValueError, UnicodeDecodeError) as exc:
         raise AppError(
             ErrorCode.VALIDATION_ERROR,
             "Invalid pagination cursor.",
             status_code=400,
             retryable=False,
-        )
+        ) from exc

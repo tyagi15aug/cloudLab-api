@@ -5,6 +5,7 @@ root). Nothing here should ever hold a real secret — for CLOUD_PROVIDER=aws,
 leave the access-key fields unset and let boto3's default credential chain
 handle it.
 """
+
 from __future__ import annotations
 
 from functools import lru_cache

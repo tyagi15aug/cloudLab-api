@@ -7,6 +7,7 @@ RequestIDMiddleware and picked up automatically by every log record emitted
 during that request — including ones logged deep inside a service or
 provider that has no direct handle on the request.
 """
+
 from __future__ import annotations
 
 import contextvars
@@ -16,9 +17,7 @@ import sys
 import time
 from typing import Any
 
-request_id_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar(
-    "request_id", default=None
-)
+request_id_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar("request_id", default=None)
 
 
 class JSONFormatter(logging.Formatter):
@@ -109,7 +108,9 @@ def log_operation(
     level = logging.ERROR if error else logging.INFO
     logger.log(
         level,
-        "%s %s", service, operation,
+        "%s %s",
+        service,
+        operation,
         extra={
             "operation": operation,
             "service": service,

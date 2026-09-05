@@ -27,7 +27,5 @@ class AWSProvider(CloudProvider):
 
     def get_client(self, service_name: str) -> Any:
         if service_name not in self._clients:
-            self._clients[service_name] = boto3.client(
-                service_name, region_name=self._region
-            )
+            self._clients[service_name] = boto3.client(service_name, region_name=self._region)
         return self._clients[service_name]

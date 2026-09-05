@@ -17,6 +17,7 @@ boto3 client for a given AWS service name); resource-specific behavior
 belongs in app/services/, not here. Widen this interface only when a real
 service needs something a boto3 client can't give it.
 """
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

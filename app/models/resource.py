@@ -5,6 +5,7 @@ tags/created-at) the plan asks every AWS resource to share, trimmed to the
 fields S3 buckets actually have — a bucket has no meaningful "status"
 beyond existing, so that field is omitted rather than faked.
 """
+
 from __future__ import annotations
 
 from datetime import datetime

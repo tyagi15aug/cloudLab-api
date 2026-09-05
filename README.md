@@ -7,10 +7,11 @@ than a `boto3` wrapper. See `docs/implementation-plan.md` for the full
 design and phase plan.
 
 The React console lives in the sibling [`cloud-control-plane-web`](../cloud-control-plane-web)
-repo (Phase 1.4 — not built yet).
+repo.
 
-**Status:** Phase 1.1–1.3 done — LocalStack, the provider abstraction, and
-the S3 backend exist. Phase 1.4+ (React console, tests, CI) is next.
+**Status:** Phase 1 complete (1.1–1.7) — LocalStack, the provider
+abstraction, the S3 backend, the React console, unit tests on both sides,
+and CI are all in place. See that repo's README for the frontend.
 
 ## Prerequisites
 
@@ -29,6 +30,14 @@ This starts:
 - **localstack** on `http://localhost:4566` (S3 only for now)
 - **api** on `http://localhost:8000`
 
+> **Note:** this was built and verified in a sandboxed environment whose
+> network policy blocks pulling images from Docker Hub entirely (even
+> `python:3.12-slim`), so `docker compose up` itself could not be run there.
+> Everything else — the app code, both test suites, both builds — was
+> verified for real; this compose file and Dockerfile are straightforward
+> and should just work, but they're the first thing to confirm in an
+> environment with normal registry access.
+
 Verify:
 
 ```bash
@@ -46,6 +55,9 @@ curl -X DELETE http://localhost:8000/api/resources/s3/buckets/demo-bucket
 ```
 
 Interactive API docs: `http://localhost:8000/docs`.
+
+To run the console against this API, see `cloud-control-plane-web`'s README
+— its dev server proxies `/api` and `/health` here automatically.
 
 ## Running the API without Docker
 
@@ -111,17 +123,35 @@ app/
   models/     pydantic resource/error schemas
   providers/  CloudProvider abstraction (LocalStack/AWS)
   services/   S3Service and friends
-tests/        Phase 1.6 (not implemented yet)
+tests/        pytest + moto — service, error-mapping, and route tests
 docs/
   implementation-plan.md
 infrastructure/
 scripts/
+.github/workflows/ci.yml
 docker-compose.yml
 .env.example
 ```
 
 ## Tests
 
-Not yet implemented — Phase 1.6 of the plan (backend unit testing with
-Moto) covers this. `requirements-dev.txt` is already pinned in
-anticipation of it.
+```bash
+pip install -r requirements-dev.txt
+pytest                       # 36 tests: service logic, error mapping, routes
+ruff check .                 # lint
+ruff format --check .        # formatting
+mypy app --ignore-missing-imports
+```
+
+Tests run against [moto](https://github.com/getmoto/moto)'s in-process AWS
+mock rather than a real LocalStack container — sub-second, no Docker
+required, and exactly what Section 5.3 of the plan calls for ("Moto for
+fast isolated Python tests"). `tests/conftest.py`'s `FakeProvider`
+implements the same `CloudProvider` interface the real app depends on, so
+these tests exercise real `S3Service` and route code, not a parallel mock
+of it.
+
+## CI
+
+`.github/workflows/ci.yml` runs lint, format check, type check, the test
+suite (with coverage), and a Docker build on every push/PR to `main`.
