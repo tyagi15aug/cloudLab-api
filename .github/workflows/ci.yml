@@ -30,7 +30,13 @@ jobs:
         run: mypy app --ignore-missing-imports
 
       - name: Unit tests
-        run: pytest --cov=app --cov-report=term-missing
+        run: pytest tests --ignore=tests/integration --cov=app --cov-report=term-missing
+
+      - name: Integration tests
+        # Real LocalStackProvider/app over real HTTP against a moto-server
+        # process (stands in for a LocalStack container — see
+        # tests/integration/conftest.py for why).
+        run: pytest tests/integration -v
 
       - name: Build Docker image
         run: docker build -t cloud-control-plane-api .

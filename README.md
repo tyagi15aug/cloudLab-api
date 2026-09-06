@@ -9,9 +9,10 @@ design and phase plan.
 The React console lives in the sibling [`cloud-control-plane-web`](../cloud-control-plane-web)
 repo.
 
-**Status:** Phase 1 complete (1.1–1.7) — LocalStack, the provider
-abstraction, the S3 backend, the React console, unit tests on both sides,
-and CI are all in place. See that repo's README for the frontend.
+**Status:** Phases 1 and 2 complete — LocalStack, the provider abstraction,
+the S3 backend, the React console, unit + integration + E2E tests, and CI
+are all in place. See that repo's README for the frontend, and
+`scripts/`/`tests/integration/` below for what Phase 2 added.
 
 ## Prerequisites
 
@@ -123,11 +124,14 @@ app/
   models/     pydantic resource/error schemas
   providers/  CloudProvider abstraction (LocalStack/AWS)
   services/   S3Service and friends
-tests/        pytest + moto — service, error-mapping, and route tests
+tests/
+  test_*.py         unit tests (moto in-process mock)
+  integration/      Phase 2.2 — real HTTP against a moto-server process
 docs/
   implementation-plan.md
 infrastructure/
 scripts/
+  dev-up.sh, seed.sh, dev-down.sh, reset.sh
 .github/workflows/ci.yml
 docker-compose.yml
 .env.example
@@ -137,21 +141,56 @@ docker-compose.yml
 
 ```bash
 pip install -r requirements-dev.txt
-pytest                       # 36 tests: service logic, error mapping, routes
+pytest tests --ignore=tests/integration --cov=app   # 36 unit tests
+pytest tests/integration -v                          # 9 integration tests
 ruff check .                 # lint
 ruff format --check .        # formatting
 mypy app --ignore-missing-imports
 ```
 
-Tests run against [moto](https://github.com/getmoto/moto)'s in-process AWS
-mock rather than a real LocalStack container — sub-second, no Docker
-required, and exactly what Section 5.3 of the plan calls for ("Moto for
-fast isolated Python tests"). `tests/conftest.py`'s `FakeProvider`
-implements the same `CloudProvider` interface the real app depends on, so
-these tests exercise real `S3Service` and route code, not a parallel mock
-of it.
+**Unit tests** (`tests/*.py`) run against [moto](https://github.com/getmoto/moto)'s
+in-process AWS mock rather than a real LocalStack container — sub-second,
+no Docker required, and exactly what Section 5.3 of the plan calls for
+("Moto for fast isolated Python tests"). `tests/conftest.py`'s
+`FakeProvider` implements the same `CloudProvider` interface the real app
+depends on, so these tests exercise real `S3Service` and route code, not a
+parallel mock of it.
+
+**Integration tests** (`tests/integration/`, Phase 2.2) spin up a real
+`moto.server` subprocess and talk to it over real HTTP with the real
+`LocalStackProvider` class and, in `test_app_lifecycle.py`, the real
+FastAPI app including its startup connectivity-retry lifespan — the
+network path the unit tests bypass by design. `tests/integration/conftest.py`
+explains why moto-server rather than a real LocalStack container (same
+Docker Hub sandbox limitation as above); a real LocalStack container is a
+drop-in replacement — just point `AWS_ENDPOINT_URL` at it, no test code
+changes.
+
+One of these tests caught a genuine AWS quirk worth knowing about: S3's
+`CreateBucket` is idempotent for the bucket's own owner in `us-east-1`
+(200 OK on recreate) but raises `BucketAlreadyOwnedByYou`/`BucketAlreadyExists`
+in every other region — moto reproduces this faithfully, so
+`test_create_duplicate_bucket_maps_to_conflict_over_real_http` uses a
+non-default region to actually exercise the conflict-mapping code path.
+
+## Scripts (Phase 2.1)
+
+```bash
+./scripts/dev-up.sh       # docker compose up --build, wait for health, seed demo data
+./scripts/seed.sh         # (re-)create the two demo buckets from the plan's Section 12.1
+./scripts/dev-down.sh     # docker compose down (--volumes to also drop LocalStack state)
+./scripts/reset.sh        # drop LocalStack state and bring the stack back up + reseeded
+```
+
+## E2E tests
+
+The `cloud-control-plane-web` repo's `tests/e2e/` (Playwright) drives the
+real console in a real browser against this API — see that repo's README.
+`scripts/dev-up.sh` above is the fastest way to get this API into the state
+those tests expect.
 
 ## CI
 
-`.github/workflows/ci.yml` runs lint, format check, type check, the test
-suite (with coverage), and a Docker build on every push/PR to `main`.
+`.github/workflows/ci.yml` runs lint, format check, type check, the unit
+test suite (with coverage), the integration test suite, and a Docker build
+on every push/PR to `main`.
