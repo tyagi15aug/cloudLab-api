@@ -1,21 +1,6 @@
 from __future__ import annotations
 
 import pytest
-from fastapi.testclient import TestClient
-
-from app.main import app
-from app.providers.factory import get_provider
-
-
-@pytest.fixture
-def client(provider):
-    # Bypasses the real (LocalStack/AWS) provider entirely; used without
-    # `with` so the app's lifespan (which retries a real connectivity
-    # check) never runs — these are route/service tests, not a real
-    # end-to-end startup test.
-    app.dependency_overrides[get_provider] = lambda: provider
-    yield TestClient(app)
-    app.dependency_overrides.clear()
 
 
 def test_health_reports_ok(client):

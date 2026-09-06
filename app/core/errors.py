@@ -86,6 +86,26 @@ _CLIENT_ERROR_MAP: dict[str, tuple[ErrorCode, int, bool]] = {
     "RequestTimeout": (ErrorCode.PROVIDER_UNAVAILABLE, 503, True),
     "ServiceUnavailable": (ErrorCode.PROVIDER_UNAVAILABLE, 503, True),
     "InternalError": (ErrorCode.PROVIDER_ERROR, 502, True),
+    # -- SQS (Phase 3.2) ---------------------------------------------------
+    "AWS.SimpleQueueService.NonExistentQueue": (ErrorCode.RESOURCE_NOT_FOUND, 404, False),
+    "QueueAlreadyExists": (ErrorCode.RESOURCE_ALREADY_EXISTS, 409, False),
+    # A queue can't be recreated with the same name for ~60s after deletion
+    # on real AWS; moto doesn't enforce the timer, but map the code in case
+    # it ever does.
+    "AWS.SimpleQueueService.QueueDeletedRecently": (ErrorCode.RESOURCE_CONFLICT, 409, True),
+    "ReceiptHandleIsInvalid": (ErrorCode.VALIDATION_ERROR, 400, False),
+    "InvalidMessageContents": (ErrorCode.VALIDATION_ERROR, 400, False),
+    # -- DynamoDB (Phase 3.3) ----------------------------------------------
+    "ResourceNotFoundException": (ErrorCode.RESOURCE_NOT_FOUND, 404, False),
+    # Also covers "table already exists" and "table mid create/delete" — both
+    # are real DynamoDB overloads of the same code.
+    "ResourceInUseException": (ErrorCode.RESOURCE_ALREADY_EXISTS, 409, False),
+    "ConditionalCheckFailedException": (ErrorCode.RESOURCE_CONFLICT, 409, False),
+    "ProvisionedThroughputExceededException": (ErrorCode.THROTTLED, 429, True),
+    "LimitExceededException": (ErrorCode.THROTTLED, 429, True),
+    # DynamoDB's ValidationException is used for both real request-shape
+    # problems and this app's own bad-input cases — always a 400.
+    "ValidationException": (ErrorCode.VALIDATION_ERROR, 400, False),
 }
 
 

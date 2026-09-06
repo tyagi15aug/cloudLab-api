@@ -10,8 +10,10 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.api.routes_dynamodb import router as dynamodb_router
 from app.api.routes_health import router as health_router
 from app.api.routes_s3 import router as s3_router
+from app.api.routes_sqs import router as sqs_router
 from app.core.config import get_settings
 from app.core.errors import AppError, ErrorCode
 from app.core.logging import configure_logging, request_id_ctx
@@ -151,6 +153,8 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(s3_router)
+    app.include_router(sqs_router)
+    app.include_router(dynamodb_router)
 
     return app
 

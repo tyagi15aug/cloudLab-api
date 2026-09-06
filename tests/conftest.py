@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import boto3
 import pytest
+from fastapi.testclient import TestClient
 from moto import mock_aws
 
+from app.main import app
 from app.providers.base import CloudProvider
+from app.providers.factory import get_provider
 
 
 class FakeProvider(CloudProvider):
@@ -47,3 +50,14 @@ def make_provider(aws):
         return FakeProvider(region=region)
 
     return _make
+
+
+@pytest.fixture
+def client(provider):
+    """A FastAPI TestClient wired to the FakeProvider, shared by every
+    tests/test_routes_*.py module. Used without `with` so the app's
+    lifespan (which retries a real connectivity check) never runs — these
+    are route/service tests, not a real end-to-end startup test."""
+    app.dependency_overrides[get_provider] = lambda: provider
+    yield TestClient(app)
+    app.dependency_overrides.clear()

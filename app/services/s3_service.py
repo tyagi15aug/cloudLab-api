@@ -8,59 +8,25 @@ boto3/botocore detail is translated or absorbed before it goes back up.
 
 from __future__ import annotations
 
-import base64
 import logging
 from datetime import datetime
 
-from botocore.exceptions import BotoCoreError, ClientError
-
-from app.core.errors import AppError, ErrorCode, translate_boto_error
-from app.core.logging import elapsed_ms, log_operation, timed_ms
+from app.core.errors import AppError, ErrorCode
 from app.models.resource import BucketResource
 from app.providers.base import CloudProvider
+from app.services.base import ProviderService
+from app.services.pagination import decode_cursor, encode_cursor
 
 logger = logging.getLogger("app.services.s3")
 
 DEFAULT_PAGE_SIZE = 50
 
 
-class S3Service:
+class S3Service(ProviderService):
+    service_name = "s3"
+
     def __init__(self, provider: CloudProvider) -> None:
-        self._provider = provider
-
-    def _client(self):
-        return self._provider.get_client("s3")
-
-    # -- internal helper: every provider call goes through here so timing,
-    # structured logging, and error translation happen exactly once. -------
-    def _call(self, operation: str, fn, *, resource: str | None = None):
-        start = timed_ms()
-        try:
-            result = fn()
-        except (ClientError, BotoCoreError) as exc:
-            app_error = translate_boto_error(exc, resource=resource)
-            log_operation(
-                logger,
-                operation=operation,
-                service="s3",
-                provider=self._provider.name,
-                duration_ms=elapsed_ms(start),
-                status="error",
-                resource=resource,
-                error=app_error.code.value,
-            )
-            raise app_error from exc
-        else:
-            log_operation(
-                logger,
-                operation=operation,
-                service="s3",
-                provider=self._provider.name,
-                duration_ms=elapsed_ms(start),
-                status="success",
-                resource=resource,
-            )
-            return result
+        super().__init__(provider, logger=logger)
 
     # -- public API -----------------------------------------------------
 
@@ -94,10 +60,10 @@ class S3Service:
             for b in buckets
         ]
 
-        offset = _decode_cursor(cursor)
+        offset = decode_cursor(cursor)
         page = all_resources[offset : offset + page_size]
         next_offset = offset + page_size
-        next_cursor = _encode_cursor(next_offset) if next_offset < len(all_resources) else None
+        next_cursor = encode_cursor(next_offset) if next_offset < len(all_resources) else None
 
         return page, next_cursor
 
@@ -132,11 +98,6 @@ class S3Service:
 
     # -- internal helpers -------------------------------------------------
 
-    def _provider_region(self) -> str:
-        # Every client this provider hands out is configured for the same
-        # region, so any client's `.meta.region_name` reflects it.
-        return self._client().meta.region_name
-
     def _get_bucket_region(self, name: str) -> str:
         response = self._call(
             "GetBucketLocation", lambda: self._client().get_bucket_location(Bucket=name), resource=name
@@ -158,21 +119,3 @@ class S3Service:
                 return {}
             raise
         return {tag["Key"]: tag["Value"] for tag in response.get("TagSet", [])}
-
-
-def _encode_cursor(offset: int) -> str:
-    return base64.urlsafe_b64encode(str(offset).encode()).decode()
-
-
-def _decode_cursor(cursor: str | None) -> int:
-    if not cursor:
-        return 0
-    try:
-        return max(0, int(base64.urlsafe_b64decode(cursor.encode()).decode()))
-    except (ValueError, UnicodeDecodeError) as exc:
-        raise AppError(
-            ErrorCode.VALIDATION_ERROR,
-            "Invalid pagination cursor.",
-            status_code=400,
-            retryable=False,
-        ) from exc
