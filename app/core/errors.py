@@ -1,9 +1,9 @@
-"""Application-level error model.
+"""Our own error type, and the mapping that gets us there from boto3.
 
-The frontend should never see a raw boto3/botocore exception or an AWS error
-code. Every provider-facing failure is translated into an AppError with a
-stable `code`, a human message, and a `retryable` flag the UI can act on
-directly (see Phase Plan section 14, "Error Model"):
+The frontend should never have to know what a raw botocore exception or an
+AWS error code looks like. Every provider failure gets translated into an
+AppError with a stable `code`, a plain-English message, and a `retryable`
+flag the UI can act on directly:
 
     retryable=true   -> show a Retry action
     retryable=false  -> show an actionable, non-retryable error
@@ -86,7 +86,7 @@ _CLIENT_ERROR_MAP: dict[str, tuple[ErrorCode, int, bool]] = {
     "RequestTimeout": (ErrorCode.PROVIDER_UNAVAILABLE, 503, True),
     "ServiceUnavailable": (ErrorCode.PROVIDER_UNAVAILABLE, 503, True),
     "InternalError": (ErrorCode.PROVIDER_ERROR, 502, True),
-    # -- SQS (Phase 3.2) ---------------------------------------------------
+    # -- SQS -----------------------------------------------------------
     "AWS.SimpleQueueService.NonExistentQueue": (ErrorCode.RESOURCE_NOT_FOUND, 404, False),
     "QueueAlreadyExists": (ErrorCode.RESOURCE_ALREADY_EXISTS, 409, False),
     # A queue can't be recreated with the same name for ~60s after deletion
@@ -95,7 +95,7 @@ _CLIENT_ERROR_MAP: dict[str, tuple[ErrorCode, int, bool]] = {
     "AWS.SimpleQueueService.QueueDeletedRecently": (ErrorCode.RESOURCE_CONFLICT, 409, True),
     "ReceiptHandleIsInvalid": (ErrorCode.VALIDATION_ERROR, 400, False),
     "InvalidMessageContents": (ErrorCode.VALIDATION_ERROR, 400, False),
-    # -- DynamoDB (Phase 3.3) ----------------------------------------------
+    # -- DynamoDB --------------------------------------------------------
     "ResourceNotFoundException": (ErrorCode.RESOURCE_NOT_FOUND, 404, False),
     # Also covers "table already exists" and "table mid create/delete" — both
     # are real DynamoDB overloads of the same code.

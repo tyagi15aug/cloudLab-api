@@ -22,10 +22,10 @@ def build_provider(settings: Settings) -> CloudProvider:
 
 @lru_cache
 def get_provider() -> CloudProvider:
-    """Process-wide singleton provider, built from the active settings.
+    """The one provider instance for the whole process, built from settings.
 
-    FastAPI route handlers should depend on this via Depends(get_provider)
-    (see app/api/deps.py) rather than importing it directly, so tests can
-    override it.
+    Routes should pull this in via Depends(get_provider) (app/api/deps.py)
+    rather than importing it directly — that's what lets tests swap in a
+    fake provider without touching route code.
     """
     return build_provider(get_settings())

@@ -1,14 +1,15 @@
-"""DynamoDB application service (Phase 3.3).
+"""DynamoDB application service.
 
-Two things make this service meaningfully different from S3Service/SqsService:
+Two things make this one different from S3Service/SqsService:
 
-1. Items are freeform JSON above this layer — `_to_plain`/`_to_attribute_value`
-   are the only place DynamoDB's typed AttributeValue wire format
-   (`{"S": "x"}`, `{"N": "1"}`, ...) is visible in the codebase.
-2. Item listing uses DynamoDB's own native pagination (`LastEvaluatedKey`),
-   not the offset-based cursor S3Service uses — Scan has no concept of an
-   arbitrary offset, only "continue after this key". The cursor here is a
-   base64-encoded JSON blob of that key instead of an integer offset.
+1. Above this layer, items are just plain JSON. The helpers at the bottom
+   of this file (`_to_plain`/`_to_attribute_value_map`) are the only place
+   in the codebase that ever has to look at DynamoDB's typed AttributeValue
+   wire format (`{"S": "x"}`, `{"N": "1"}`, ...).
+2. Item listing uses DynamoDB's own pagination (`LastEvaluatedKey`) instead
+   of the offset cursor S3Service uses — a Scan has no concept of an
+   arbitrary offset, only "continue after this key". So the cursor here is
+   a base64-encoded JSON blob of that key, not an integer.
 """
 
 from __future__ import annotations
@@ -154,13 +155,12 @@ def _to_attribute_value_map(plain: dict[str, Any]) -> dict[str, Any]:
 
 
 def _to_dynamo_compatible(value: Any) -> Any:
-    """boto3's TypeSerializer refuses native Python floats outright ("Float
-    types are not supported. Use Decimal types instead.") — real bug this
-    surfaced: JSON request bodies naturally produce floats for any
-    non-integer number, so every item with a decimal value would 400
-    without this conversion. `str(value)` avoids binary float imprecision
-    (Decimal(4.5) directly can produce long repeating-binary artifacts;
-    Decimal(str(4.5)) doesn't)."""
+    """boto3 flat-out refuses native Python floats ("Float types are not
+    supported. Use Decimal types instead."), and every non-integer number
+    coming off a JSON request body is a float — so without this, any item
+    with a decimal value in it would 400. Converting through `str(value)`
+    matters: `Decimal(4.5)` directly picks up binary-float imprecision,
+    `Decimal(str(4.5))` doesn't."""
     if isinstance(value, float):
         return Decimal(str(value))
     if isinstance(value, dict):

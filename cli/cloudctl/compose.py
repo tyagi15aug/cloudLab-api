@@ -1,15 +1,13 @@
 """Process/infrastructure lifecycle: `docker compose` and the repo's own
 scripts.
 
-Phase 7.2's design principle ("avoid building a completely separate
-implementation") cuts the opposite way from client.py here: `scripts/
-dev-up.sh`, `dev-down.sh`, `seed.sh`, and `reset.sh` are already the one
-correct implementation of "start the stack", "wait for health", "seed
-demo data", and "reset state" (they encode real details — healthcheck
-polling, idempotent seeding — that would just get re-derived, and
-probably re-broken, if rewritten here). So `up`/`down`/`seed`/`reset`/
-`test` delegate to those scripts by subprocess; only `status` and `logs`,
-which no script covers, talk to `docker compose` directly.
+`scripts/dev-up.sh`, `dev-down.sh`, `seed.sh`, and `reset.sh` already do
+"start the stack" / "wait for health" / "seed demo data" / "reset state"
+correctly — they know real details (healthcheck polling, idempotent
+seeding) that would just get re-derived, and probably re-broken, if
+rewritten here. So `up`/`down`/`seed`/`reset`/`test` just call those
+scripts. `status` and `logs` have no script to lean on, so those talk to
+`docker compose` directly.
 """
 
 from __future__ import annotations

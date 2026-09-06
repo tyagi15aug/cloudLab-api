@@ -1,12 +1,11 @@
-"""DynamoDB resource shapes (Phase 3.3).
+"""DynamoDB resource shapes.
 
-Items are freeform by nature (that's the point of a NoSQL table), so
-`ItemResource` deliberately doesn't try to force a schema on them — it's a
-plain JSON object. `DynamoDbService` (services/dynamodb_service.py) is what
-converts between DynamoDB's typed AttributeValue wire format
-(`{"S": "x"}`, `{"N": "1"}`, ...) and this plain-JSON shape, so nothing
-above the service layer needs to know DynamoDB's type-tagging scheme
-exists.
+Items are freeform by nature — that's the whole point of a NoSQL table —
+so `ItemResource` doesn't try to force a schema on them; it's just a plain
+JSON object. `DynamoDbService` is what converts between that and
+DynamoDB's typed AttributeValue wire format (`{"S": "x"}`, `{"N": "1"}`,
+...), so nothing above the service layer ever has to know that type-
+tagging scheme exists.
 """
 
 from __future__ import annotations

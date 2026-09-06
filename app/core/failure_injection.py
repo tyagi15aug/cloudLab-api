@@ -1,24 +1,15 @@
-"""Phase 4: failure injection layer.
+"""The failure injection layer — lets you make any resource call fail on
+demand, for testing how the UI handles it.
 
-The plan (Phase 4.1) calls for a layer between the application provider and
-LocalStack:
+Every service already funnels its provider calls through one place
+(`ProviderService._call()` in app/services/base.py), so instead of
+building a whole new wrapper layer for this, `_call()` just checks in
+with this module before making the real boto3 call. Every service gets
+failure injection for free, no per-service code needed.
 
-    Application -> Provider -> Failure Injection Layer -> LocalStack
-
-In this codebase that seam already exists: every provider call, for every
-resource service, already funnels through `ProviderService._call()`
-(app/services/base.py) — that's exactly the "every operation goes through
-one instrumented helper" pattern Phase 3 generalized off of S3. So rather
-than adding a second wrapper layer, `_call()` consults this module before
-invoking the real boto3 call, and every service gets failure injection for
-free with zero per-service code.
-
-This is a deliberately in-process, in-memory registry — not persisted, not
-distributed, not authenticated beyond "this is a local dev tool" (see the
-plan's Phase 9.2 note that failure-injection endpoints should eventually be
-protected; that's future work, not required for the MVP of this
-capability). It resets on process restart, same as `docker compose down`
-would reset everything else about the dev environment.
+This is a plain in-memory registry — no persistence, no auth beyond "this
+is a local dev tool." It resets on restart, same as everything else about
+the dev environment does when you bring the stack down.
 """
 
 from __future__ import annotations
@@ -104,13 +95,13 @@ class FailureRule:
 
 
 class FailureInjector:
-    """Process-wide registry of active failure rules, plus the evaluator
-    `ProviderService._call()` consults before every real provider call.
+    """Process-wide registry of active failure rules, plus the check
+    `ProviderService._call()` runs before every real provider call.
 
-    A `threading.Lock` guards the rule dict because FastAPI runs sync route
-    handlers (every route in this app) in a thread pool — a dev-tools
-    request adding a rule and a resource request evaluating rules can
-    genuinely race on separate threads.
+    Guarded by a lock because FastAPI runs its (sync) route handlers in a
+    thread pool — someone adding a rule through the dev-tools API and a
+    resource call checking the rules can genuinely land on different
+    threads at the same time.
     """
 
     def __init__(self) -> None:
@@ -154,12 +145,12 @@ class FailureInjector:
             self._rules.clear()
 
     def apply(self, *, service: str, operation: str) -> None:
-        """Consulted by `ProviderService._call()` before the real provider
-        call. Either returns normally (no matching rule, or a probability
-        roll that didn't hit), sleeps and returns (a LATENCY rule — the real
-        call still happens, just slower), or sleeps (if configured) and
-        raises an `AppError` that short-circuits the real call entirely
-        (every other failure type).
+        """Called by `ProviderService._call()` right before the real
+        provider call. Three things can happen: nothing (no matching rule,
+        or a probability roll that missed), a delay and then nothing (a
+        LATENCY rule — the real call still goes through, just slower), or
+        a delay and then an `AppError` that stops the real call from
+        happening at all (every other failure type).
         """
         with self._lock:
             matching = [r for r in self._rules.values() if r.matches(service, operation)]
@@ -195,7 +186,6 @@ class FailureInjector:
             raise AppError(code, message, status_code=status_code, retryable=retryable)
 
 
-#: One process-wide instance — every ProviderService subclass shares it, the
-#: same way they'd share a single real failure-injection sidecar in a
-#: multi-process deployment.
+#: One instance for the whole process — every ProviderService subclass
+#: shares it.
 failure_injector = FailureInjector()

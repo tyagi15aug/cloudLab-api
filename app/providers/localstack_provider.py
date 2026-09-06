@@ -8,11 +8,11 @@ from app.providers.base import CloudProvider
 
 
 class LocalStackProvider(CloudProvider):
-    """Routes AWS SDK calls at a LocalStack endpoint.
+    """Points the AWS SDK at a LocalStack endpoint instead of real AWS.
 
-    LocalStack accepts any non-empty credentials, so the access key/secret
-    here are placeholders ("test"/"test" by default) rather than real
-    secrets — see .env.example.
+    LocalStack doesn't check credentials, just that something is there —
+    so the access key/secret below are placeholders ("test"/"test" by
+    default), not real secrets. See .env.example.
     """
 
     def __init__(

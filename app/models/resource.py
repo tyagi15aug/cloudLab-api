@@ -1,9 +1,9 @@
-"""Shared resource + error response shapes (Phase Plan sections 6.2 and 14).
+"""Shared resource + error response shapes.
 
-BucketResource follows the common resource shape (id/name/status/region/
-tags/created-at) the plan asks every AWS resource to share, trimmed to the
-fields S3 buckets actually have — a bucket has no meaningful "status"
-beyond existing, so that field is omitted rather than faked.
+BucketResource follows the same general shape (id/name/region/tags/
+created_at) every resource in this app shares, trimmed down to what a
+bucket actually has — there's no meaningful "status" for a bucket beyond
+existing, so we just don't fake one.
 """
 
 from __future__ import annotations

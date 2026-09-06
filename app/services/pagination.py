@@ -1,9 +1,10 @@
-"""Shared application-level cursor pagination (Phase 3 refactor).
+"""Cursor pagination, shared across services that don't have a native
+cursor to lean on.
 
-Originally lived inside s3_service.py as `_encode_cursor`/`_decode_cursor`;
-extracted so SQS/DynamoDB services can paginate the same way without
-copy-pasting it — see app/services/s3_service.py's list_buckets docstring
-for why this is offset-based rather than native AWS pagination.
+This used to live inside s3_service.py as private helpers; pulled out so
+DynamoDB's table listing (and anything else that needs it) doesn't have
+to copy-paste it. See S3Service.list_buckets for why S3 needs this at
+all instead of using AWS's own pagination.
 """
 
 from __future__ import annotations

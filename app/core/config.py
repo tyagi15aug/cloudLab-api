@@ -1,9 +1,8 @@
-"""Application configuration.
+"""App settings, pulled from environment variables (see .env.example).
 
-Settings are sourced from environment variables (see .env.example at the repo
-root). Nothing here should ever hold a real secret — for CLOUD_PROVIDER=aws,
-leave the access-key fields unset and let boto3's default credential chain
-handle it.
+Don't add real secrets here. If you're pointing this at real AWS
+(CLOUD_PROVIDER=aws), leave the access-key fields unset and let boto3's
+own credential chain figure it out.
 """
 
 from __future__ import annotations

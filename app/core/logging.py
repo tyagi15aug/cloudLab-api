@@ -1,11 +1,11 @@
 """Structured logging.
 
-Every log line is emitted as a single JSON object so it can be grepped,
-shipped, and (later, in Phase 5/6) correlated by request_id without a log
-parser. The request_id contextvar is set once per HTTP request by
-RequestIDMiddleware and picked up automatically by every log record emitted
-during that request — including ones logged deep inside a service or
-provider that has no direct handle on the request.
+Every log line comes out as one JSON object, so it's grep-able and can be
+shipped somewhere and correlated by request_id without needing a log
+parser. The request_id is set once per HTTP request (RequestIDMiddleware,
+in main.py) and picked up automatically by anything that logs during that
+request — even a service or provider three layers down that has no idea
+what request it's part of.
 """
 
 from __future__ import annotations
@@ -98,12 +98,10 @@ def log_operation(
     resource: str | None = None,
     error: str | None = None,
 ) -> None:
-    """Emit one structured event for a completed provider operation.
-
-    This is the shape referenced in Phase 5's observability model
-    (request_id/operation/service/resource/provider/duration/status/error) —
-    building it now, even though the operation-history *UI* doesn't exist
-    yet, means every operation already has a consistent event to read from.
+    """Log one line for a completed provider call: what it was, how long it
+    took, and whether it worked. Every resource operation goes through this
+    (see ProviderService._call in services/base.py), so the log has one
+    consistent shape to read no matter which service made the call.
     """
     level = logging.ERROR if error else logging.INFO
     logger.log(

@@ -26,9 +26,9 @@ logger = logging.getLogger("app.main")
 
 
 class RequestIDMiddleware(BaseHTTPMiddleware):
-    """Assigns a request_id to every request, echoes it back as a response
-    header, and makes it available to every log line emitted while handling
-    the request via the request_id contextvar (app/core/logging.py)."""
+    """Gives every request a request_id, echoes it back as a response
+    header, and makes it available to any log line emitted while handling
+    that request (via the contextvar in app/core/logging.py)."""
 
     async def dispatch(self, request: Request, call_next):
         request_id = request.headers.get("x-request-id") or uuid.uuid4().hex[:12]
@@ -57,14 +57,14 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 
 
 def _verify_provider_connectivity() -> None:
-    """Retry a cheap S3 call a few times before declaring the provider
-    unreachable (Phase 1.1: "Add health-check/startup handling").
+    """Retry a cheap S3 call a few times before giving up on the provider
+    being reachable.
 
-    docker-compose's `depends_on: condition: service_healthy` already keeps
-    the api container from starting before LocalStack's own healthcheck
-    passes, but that's a property of Compose, not of the app — running the
-    API directly (`uvicorn app.main:app`) against a LocalStack that's still
-    booting has no such guarantee, so the app retries on its own too.
+    docker-compose's `depends_on: condition: service_healthy` already stops
+    the API container from starting before LocalStack's own healthcheck
+    passes — but that's a Compose guarantee, not an app one. Run this
+    directly (`uvicorn app.main:app`) against a LocalStack that's still
+    booting and you're on your own, which is why the app retries too.
     """
     settings = get_settings()
     provider = get_provider()
@@ -125,8 +125,8 @@ def create_app() -> FastAPI:
     @app.exception_handler(RequestValidationError)
     async def validation_error_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
         # Keep request-body validation errors in the same {"error": {...}}
-        # shape as every other error (see section 14 of the plan) instead of
-        # leaking FastAPI's default {"detail": [...]} format.
+        # shape as every other error, instead of leaking FastAPI's default
+        # {"detail": [...]} format.
         first = exc.errors()[0] if exc.errors() else {}
         field = ".".join(str(p) for p in first.get("loc", []) if p != "body")
         message = f"{field}: {first.get('msg')}" if field else (first.get("msg") or "Invalid request.")

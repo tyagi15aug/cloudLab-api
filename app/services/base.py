@@ -1,10 +1,10 @@
-"""Shared service-layer plumbing (Phase 3 refactor).
+"""Shared service-layer plumbing.
 
-`S3Service` (Phase 1) implemented this same "every provider call goes
-through one instrumented helper" pattern on its own. Extracting it here
-before adding SQS/DynamoDB is exactly the point of Phase 3.1/3.4: a second
-and third resource shouldn't have to re-invent (or copy-paste) timing +
-structured logging + error translation.
+Every resource service (S3, SQS, DynamoDB) routes its provider calls
+through `ProviderService._call()` below instead of hitting the boto3
+client directly. One place doing timing, error translation, structured
+logging, failure injection, and operation history means adding a fourth
+resource type never means copy-pasting all of that again.
 """
 
 from __future__ import annotations
@@ -46,13 +46,12 @@ class ProviderService:
         start = timed_ms()
         request_id = request_id_ctx.get()
         try:
-            # Phase 4: consulted before every real provider call so any
-            # resource service gets failure injection for free — see
-            # app/core/failure_injection.py. Raises AppError directly (for
-            # every failure type except pure LATENCY, which just delays)
-            # rather than a botocore exception, since there's no real AWS
-            # call to fail; the `except AppError` branch below logs it
-            # exactly like a translated real error.
+            # Give the failure injector (app/core/failure_injection.py) a
+            # chance to fake a failure before we make the real call. It
+            # raises an AppError directly rather than a botocore exception
+            # — there's no real AWS call happening for it to fail — which
+            # is why the `except AppError` branch below exists: it logs an
+            # injected failure exactly the same way as a real one.
             failure_injector.apply(service=self.service_name, operation=operation)
             result = fn()
         except AppError as exc:
@@ -67,11 +66,11 @@ class ProviderService:
                 resource=resource,
                 error=exc.code.value,
             )
-            # Phase 5: the same completed-operation event `log_operation`
-            # just emitted to stdout, additionally kept queryable over HTTP
-            # — see app/core/operations.py. An injected failure (above) and
-            # a real translated one (below) both land here identically,
-            # since by this point they're both just an AppError.
+            # Same event as the log line above, but kept in memory too so
+            # it's queryable over HTTP (app/core/operations.py) instead of
+            # only living in stdout. An injected failure and a real one
+            # both end up here looking identical — by this point they're
+            # both just an AppError, and that's fine.
             operation_recorder.record(
                 service=self.service_name,
                 operation=operation,

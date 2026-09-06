@@ -1,23 +1,18 @@
-"""Phase 5: in-process operation history and metrics.
+"""In-process operation history and metrics.
 
-The plan's observability model (Sections 5 and 15) asks for every
-significant operation to carry a request_id/operation/service/resource/
-provider/duration/status/error tuple. `app/core/logging.py`'s
-`log_operation` already builds and emits exactly that shape as a structured
-JSON log line — this module keeps the same event in an in-memory, queryable
-form too, so a developer (or an E2E test) can read "what just happened"
-back out over HTTP instead of grepping stdout.
+`log_operation` (app/core/logging.py) already builds a
+request_id/operation/service/resource/provider/duration/status/error
+event and writes it to stdout as JSON. This module keeps the same event
+in memory too, so a developer — or an E2E test — can ask "what just
+happened" over HTTP instead of grepping logs.
 
-Recorded the same way failure injection is applied: `ProviderService._call()`
-calls `operation_recorder.record(...)` right alongside `log_operation(...)`,
-so every resource service gets operation history for free with zero
-per-service code — and any operation that Phase 4's failure injector hit
-shows up here too (status="error", the injected AppError's code), since
-`_call()` can't tell the difference between a real boto3 failure and an
-injected one by the time it's logging the outcome. This is deliberately the
-same data Phase 6's CI log analyzer is meant to eventually correlate
-against, so the shape matches `log_operation`'s fields exactly rather than
-inventing a second, slightly different one.
+Wired in the same spot as failure injection: `ProviderService._call()`
+calls `operation_recorder.record(...)` right next to `log_operation(...)`,
+so every service gets this for free. Anything the failure injector hit
+shows up here too, with status="error" and the injected error's code —
+by the time `_call()` is logging the outcome, it genuinely can't tell an
+injected failure from a real one, and that's fine; it's what actually
+happened to the request.
 """
 
 from __future__ import annotations
@@ -28,12 +23,12 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 
-#: How many recent operations to keep in memory. This is a developer/demo
-#: panel, not a production metrics store — enough to browse a demo session
-#: without unbounded memory growth. Cumulative counters below (`_totals`,
-#: `_by_operation`) intentionally outlive eviction from this buffer, so
-#: `metrics()` stays accurate for the process's whole lifetime even once
-#: more than MAX_HISTORY operations have happened.
+#: How many recent operations to keep in memory. This is a dev/demo panel,
+#: not a production metrics store, so this just needs to cover a browsing
+#: session without growing forever. The cumulative counters below
+#: (`_totals`, `_by_operation`) don't get evicted along with old history,
+#: so `metrics()` stays accurate for the process's whole life even past
+#: MAX_HISTORY operations.
 MAX_HISTORY = 200
 
 
@@ -60,13 +55,12 @@ class _OperationStats:
 
 
 class OperationRecorder:
-    """Process-wide ring buffer of recent operations, plus cumulative
-    per-operation counters.
+    """A ring buffer of recent operations for the whole process, plus
+    running totals per operation.
 
-    Guarded by the same `threading.Lock()` pattern as `FailureInjector`
-    (app/core/failure_injection.py) — FastAPI's sync route handlers run in
-    a thread pool, so concurrent resource calls recording at the same
-    moment are a real race, not a theoretical one.
+    Locked the same way `FailureInjector` is — route handlers run in a
+    thread pool, so two resource calls recording at the same instant is a
+    real thing that happens, not just a theoretical race.
     """
 
     def __init__(self, max_history: int = MAX_HISTORY) -> None:
@@ -162,6 +156,6 @@ class OperationRecorder:
             self._by_operation.clear()
 
 
-#: One process-wide instance, mirroring `failure_injector` — every
+#: One instance for the whole process, same as `failure_injector` — every
 #: ProviderService subclass shares it.
 operation_recorder = OperationRecorder()

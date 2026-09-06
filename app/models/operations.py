@@ -1,10 +1,9 @@
-"""Phase 5: response models for the dev-only operation-history API.
+"""Response models for the dev-only operation-history API.
 
-Mirrors `app/core/operations.py`'s `OperationRecord` dataclass the same way
-`app/models/failure_injection.py` mirrors `FailureRule` — a separate wire
-model, even though the shapes look almost identical, for the same reason
-every other resource keeps its Pydantic model distinct from its internal
-representation.
+Mirrors `OperationRecord` (the dataclass in app/core/operations.py) the
+same way failure_injection.py's models mirror `FailureRule` — a separate
+wire model even though it looks almost identical, same reasoning as
+everywhere else in app/models/.
 """
 
 from __future__ import annotations

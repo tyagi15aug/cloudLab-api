@@ -1,14 +1,10 @@
 """HTTP client for cloudctl.
 
-Talks to the real Cloud Control Plane API over plain HTTP using only the
-standard library (`urllib`) — see cli/README.md's "Why stdlib-only" note.
-
-This is the half of Phase 7.2's design principle ("call the same
-application APIs/services where practical") that's actually about the
-API: `resources`, `failure`, and `/health` have no existing script or
-implementation to reuse, so this client is a thin, honest peer of the
-React console — same endpoints, same error envelope, no shortcuts through
-app internals.
+Talks to the real Cloud Control Plane API over plain HTTP, stdlib
+`urllib` only — see cli/README.md's "Why stdlib-only" note. `resources`,
+`failure`, and `/health` have no script anywhere to lean on, so this is
+just a thin, honest client of the same endpoints the React console calls
+— same error envelope, no shortcuts through app internals.
 """
 
 from __future__ import annotations
@@ -24,8 +20,8 @@ Method = Literal["GET", "POST", "DELETE"]
 DEFAULT_API_URL = "http://localhost:8000"
 
 #: Friendly aliases for FailureType values, so `cloudctl failure inject s3
-#: CreateBucket 500` (the plan's own Section 7.1 example) works verbatim
-#: alongside the API's real enum values (app/core/failure_injection.py).
+#: CreateBucket 500` reads naturally alongside the API's real enum values
+#: (app/core/failure_injection.py).
 FAILURE_ALIASES: dict[str, str] = {"500": "http_500", "403": "http_403"}
 
 
@@ -74,9 +70,9 @@ class ApiClient:
         return self._request("GET", "/health")
 
     # -- resources ----------------------------------------------------------
-    # First page only (default page_size), matching this project's demo
-    # scale (see scripts/seed.sh) rather than adding pagination the CLI's
-    # own commands don't yet need.
+    # First page only, at the default page size — fine for the small
+    # amount of demo data this project deals with, and the CLI doesn't
+    # need pagination for anything yet.
     def list_buckets(self) -> list[dict[str, Any]]:
         return self._request("GET", "/api/resources/s3/buckets")["items"]
 
@@ -118,10 +114,10 @@ class ApiClient:
     def delete_failure(self, rule_id: str) -> None:
         self._request("DELETE", f"/api/dev/failures/{rule_id}")
 
-    # -- operations (Phase 5) ------------------------------------------------
-    # Not wired to a command yet — `cloudctl status` uses /health only —
-    # but exposed here since a future `cloudctl operations` or the Phase 6
-    # CI analyzer is a natural client of this same method.
+    # -- operations -----------------------------------------------------------
+    # Not wired to a command yet (`cloudctl status` only checks /health),
+    # but it's here because a future `cloudctl operations` command would
+    # just be this one call.
     def operation_metrics(self) -> dict[str, Any]:
         return self._request("GET", "/api/dev/operations/metrics")
 

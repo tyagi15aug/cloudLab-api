@@ -8,13 +8,13 @@ from app.providers.base import CloudProvider
 
 
 class AWSProvider(CloudProvider):
-    """Routes AWS SDK calls at real AWS.
+    """Points the AWS SDK at real AWS.
 
-    Deliberately does not accept static credentials — boto3's default
-    credential chain (environment, shared config/profile, container/instance
-    role) is what should supply them. Keeping this provider "dumb" is what
-    keeps a real AWS key from ever needing to live in this codebase's
-    config.
+    On purpose, this doesn't take static credentials as an argument —
+    boto3's own credential chain (env vars, a shared profile, an
+    instance/container role) handles that. Keeping this provider dumb is
+    what keeps a real AWS key from ever needing to live in this repo's
+    config in the first place.
     """
 
     def __init__(self, *, region: str) -> None:

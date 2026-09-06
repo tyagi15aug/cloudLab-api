@@ -1,21 +1,18 @@
-"""The provider abstraction boundary.
+"""The provider abstraction — this is the thing that makes "swap LocalStack
+for real AWS" a one-line config change instead of a rewrite.
 
-Application services (see app/services/) depend on this interface, never on
-boto3 or a LocalStack endpoint URL directly:
+Services never touch boto3 or a LocalStack endpoint URL directly:
 
     Route -> Service -> CloudProvider -> {LocalStackProvider, AWSProvider}
 
-instead of every service constructing its own `boto3.client("s3",
-endpoint_url=...)`. That's the whole point of the boundary: swapping
-LocalStack for real AWS — or adding failure injection in Phase 4, or a fake
-in-memory provider for fast unit tests in Phase 1.6 — becomes "implement one
-more CloudProvider", not "grep every service for boto3.client calls".
+So adding a new backend (a fake in-memory provider for tests, say) just
+means writing one more CloudProvider, not hunting down every
+`boto3.client(...)` call in the codebase.
 
-The interface is deliberately small. `get_client` is the only thing every
-resource type will always need (an authenticated, correctly-endpointed
-boto3 client for a given AWS service name); resource-specific behavior
-belongs in app/services/, not here. Widen this interface only when a real
-service needs something a boto3 client can't give it.
+Keep this interface small. `get_client` is the one thing every resource
+type needs — an authenticated, correctly-endpointed boto3 client for a
+given AWS service name. Anything resource-specific belongs in
+app/services/, not here.
 """
 
 from __future__ import annotations
@@ -30,8 +27,8 @@ class CloudProvider(ABC):
     def name(self) -> str:
         """Short identifier for this provider, e.g. "localstack" or "aws".
 
-        Used only for observability (structured log/operation records) —
-        never branched on by service code.
+        Purely for logging/operation records — service code should never
+        branch on this.
         """
 
     @abstractmethod

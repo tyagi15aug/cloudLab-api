@@ -1,17 +1,14 @@
-"""Phase 5: developer-only operation-history and metrics API.
+"""Developer-only operation-history and metrics API.
 
-Namespaced under `/api/dev/` for the same reason as `/api/dev/failures`
-(plan Section 13, "Developer endpoints can be separated") — this exposes
-internal process state for diagnostics, not a cloud resource. Same
-unauthenticated-for-now posture as the failure-injection API; see that
-module's docstring for why that's acceptable at this stage (Phase 9
-follow-up).
+Namespaced under `/api/dev/` for the same reason as `/api/dev/failures` —
+this exposes internal process state for diagnostics, it isn't a cloud
+resource. Same unauthenticated-for-now situation too.
 
-`/metrics` is declared before `/{operation_id}` so a request for it can
-never be swallowed by the parameterized route — FastAPI/Starlette tries
-routes in declaration order, and `/metrics` failing `operation_id`'s `int`
-conversion would otherwise fall through in the wrong direction if the
-order were reversed.
+One ordering gotcha: `/metrics` has to be declared before `/{operation_id}`
+below, or a request for it would get swallowed by the parameterized route.
+FastAPI tries routes in the order they're declared, and `/metrics` failing
+the `int` conversion `{operation_id}` expects doesn't save you if that
+route came first.
 """
 
 from __future__ import annotations

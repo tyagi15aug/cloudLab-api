@@ -61,7 +61,7 @@ def put_item(name: str, body: PutItemRequest, dynamodb: DynamoDbServiceDep) -> d
 
 @router.post("/{name}/items/delete", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 def delete_item(name: str, body: DeleteItemRequest, dynamodb: DynamoDbServiceDep) -> None:
-    # Same reasoning as SQS's delete-message route: a composite key isn't a
-    # clean single path segment, so it travels in the body of a POST instead
-    # of a DELETE-with-path-param.
+    # Same call as SQS's delete-message route: a composite key doesn't fit
+    # cleanly into one path segment, so it goes in a POST body instead of
+    # a DELETE-with-path-param.
     dynamodb.delete_item(name, body.key)

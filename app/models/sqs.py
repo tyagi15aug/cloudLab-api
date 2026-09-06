@@ -1,9 +1,10 @@
-"""SQS resource shapes (Phase 3.2).
+"""SQS resource shapes.
 
-SQS's own "resource" is genuinely queue + message — the plan's shared shape
-(Section 3.1: id/name/status/region/tags) is deliberately not forced onto
-messages, which have no name and no meaningful "status" beyond existing in
-the queue. Queues get the shared shape where it fits.
+SQS genuinely has two kinds of "resource" here — queues and messages — and
+we don't force them into the same shape. A message has no name and no
+status beyond "exists in the queue right now," so it gets its own model
+instead of an awkward fit into the shared one. Queues get the shared
+shape where it actually fits.
 """
 
 from __future__ import annotations
@@ -25,8 +26,8 @@ class QueueResource(BaseModel):
 
 
 class QueueList(BaseModel):
-    # No next_cursor: see routes_sqs.py's list_queues docstring for why this
-    # resource honestly doesn't paginate rather than faking a cursor.
+    # No next_cursor here — see routes_sqs.py's list_queues comment for why
+    # queues honestly don't paginate rather than faking a cursor for them.
     items: list[QueueResource]
 
 

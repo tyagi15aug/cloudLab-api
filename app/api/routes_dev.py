@@ -1,11 +1,9 @@
-"""Phase 4: developer-only failure-injection API.
+"""Developer-only failure-injection API.
 
-Deliberately namespaced under `/api/dev/` rather than `/api/resources/` (see
-plan section 13, "Developer endpoints can be separated") — this isn't a
-cloud resource, it's a testing capability that controls how the *other*
-routes behave. Protecting this endpoint (auth, or excluding it entirely from
-a hosted/public build) is called out in the plan as Phase 9 polish, not
-required for the capability to exist and be demonstrable now.
+Namespaced under `/api/dev/` instead of `/api/resources/` on purpose —
+this isn't a cloud resource, it's a testing capability that controls how
+the *other* routes behave. It's unauthenticated for now; locking it down
+(or dropping it from a public build) is on the list, just not done yet.
 """
 
 from __future__ import annotations

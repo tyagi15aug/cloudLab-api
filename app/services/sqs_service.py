@@ -1,9 +1,10 @@
-"""SQS application service (Phase 3.2).
+"""SQS application service.
 
-Queue names are used as this app's resource id even though SQS itself
-addresses everything by queue URL — GetQueueUrl is one extra provider call,
-but it keeps the public API consistent with S3 (name-addressed) instead of
-leaking SQS's URL-based addressing into routes/frontend code.
+We use the queue name as this app's resource id, even though SQS itself
+addresses everything by queue URL. That costs an extra GetQueueUrl call
+per operation, but it keeps our API consistent with S3 (name-addressed)
+instead of leaking SQS's URL-based addressing up into routes and the
+frontend.
 """
 
 from __future__ import annotations

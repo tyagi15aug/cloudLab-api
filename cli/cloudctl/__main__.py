@@ -33,8 +33,8 @@ def _print_table(headers: Sequence[str], rows: Sequence[Sequence[Any]]) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Commands that delegate to the repo's own scripts/*.sh (compose.py's
-# docstring explains why these don't get a separate Python implementation).
+# Commands that just call the repo's own scripts/*.sh — see compose.py's
+# docstring for why these don't get their own Python implementation.
 # ---------------------------------------------------------------------------
 
 
@@ -94,8 +94,8 @@ def cmd_logs(args: argparse.Namespace) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Commands that call the real HTTP API (client.py) — the other half of the
-# Phase 7.2 design principle: nothing else implements these.
+# Commands that call the real HTTP API (client.py) — nothing else
+# implements these, so this is the only place they can live.
 # ---------------------------------------------------------------------------
 
 

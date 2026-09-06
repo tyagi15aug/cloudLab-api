@@ -1,10 +1,10 @@
-"""Phase 4: request/response models for the dev-only failure-injection API.
+"""Request/response models for the dev-only failure-injection API.
 
-Kept separate from app/core/failure_injection.py's `FailureRule` dataclass
-(the runtime registry entry) the same way every other resource keeps its
-Pydantic wire model separate from its internal representation — the two
-happen to look almost identical here, but that's incidental, not a reason
-to collapse them.
+Kept separate from `FailureRule` (the dataclass the registry actually
+stores, in app/core/failure_injection.py) the same way every other
+resource keeps its wire model separate from its internal one. They look
+almost identical right now — that's a coincidence, not a reason to merge
+them.
 """
 
 from __future__ import annotations
@@ -13,10 +13,10 @@ from pydantic import BaseModel, Field
 
 from app.core.failure_injection import WILDCARD, FailureType
 
-#: Every real operation name this app issues, plus the wildcard — see each
-#: service's `_call(...)` sites. Kept here (rather than imported from each
-#: service module) so this module has no dependency on the service layer,
-#: matching every other model file in app/models/.
+#: Every real operation name this app issues, plus the wildcard — check
+#: each service's `_call(...)` sites if you're adding a new one. Listed
+#: here by hand rather than imported from the service modules, so this
+#: file doesn't have to depend on the service layer.
 KNOWN_SERVICES: tuple[str, ...] = (WILDCARD, "s3", "sqs", "dynamodb")
 KNOWN_OPERATIONS: tuple[str, ...] = (
     WILDCARD,

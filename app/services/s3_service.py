@@ -1,9 +1,9 @@
-"""S3 application service (Phase 1.3).
+"""S3 application service.
 
-This is the only place in the codebase that should import botocore
-exception types or know an AWS error code like "BucketAlreadyExists" exists
-— routes call this service, this service calls the CloudProvider, and every
-boto3/botocore detail is translated or absorbed before it goes back up.
+This is the only place that should ever import a botocore exception type
+or know that an AWS error code like "BucketAlreadyExists" exists. Routes
+call this, this calls the CloudProvider, and every boto3 detail gets
+translated or swallowed before anything goes back up.
 """
 
 from __future__ import annotations
@@ -35,16 +35,14 @@ class S3Service(ProviderService):
     ) -> tuple[list[BucketResource], str | None]:
         """List buckets, paginated.
 
-        S3's ListBuckets returns every bucket in one call (there's no
-        per-account bucket limit that makes native pagination worth the
-        added complexity at this scale, and LocalStack's support for the
-        newer ContinuationToken/MaxBuckets params is inconsistent across
-        versions). Pagination is therefore applied at this layer: the
-        cursor is just a base64-encoded offset into the (name-sorted) full
-        list. This keeps the API contract identical to what real
-        server-side pagination would look like, so routes/frontend code
-        written against it doesn't change if this is later swapped for
-        native AWS pagination.
+        S3's ListBuckets just hands back every bucket in one call — no
+        native pagination worth relying on here, and LocalStack's support
+        for the newer ContinuationToken/MaxBuckets params isn't consistent
+        across versions anyway. So we paginate ourselves: the cursor is a
+        base64-encoded offset into the full, name-sorted list. Same API
+        shape a real paginated endpoint would have, so nothing above this
+        layer would need to change if we ever swap this for native AWS
+        pagination.
         """
         response = self._call("ListBuckets", lambda: self._client().list_buckets())
         region = self._provider_region()

@@ -18,10 +18,11 @@ router = APIRouter(prefix="/api/resources/sqs/queues", tags=["sqs"])
 
 @router.get("", response_model=QueueList)
 def list_queues(sqs: SqsServiceDep) -> QueueList:
-    # SQS's own ListQueues has no useful notion of a stable sort order or
-    # cheap pagination (it's a prefix-filtered scan, at small scale) — this
-    # app's queue count is expected to stay small, so unlike S3/DynamoDB,
-    # this one honestly doesn't paginate rather than faking a cursor.
+    # SQS's ListQueues doesn't give us a stable sort order or cheap
+    # pagination to build on (it's a prefix-filtered scan under the hood),
+    # and we don't expect this app to ever have that many queues. So unlike
+    # S3/DynamoDB, this one just doesn't paginate — an honest limitation,
+    # not a faked cursor that does nothing.
     return QueueList(items=sqs.list_queues())
 
 
@@ -54,8 +55,8 @@ def send_message(name: str, body: SendMessageRequest, sqs: SqsServiceDep) -> Mes
 
 @router.post("/{name}/messages/delete", status_code=status.HTTP_204_NO_CONTENT, response_model=None)
 def delete_message(name: str, body: DeleteMessageRequest, sqs: SqsServiceDep) -> None:
-    # A receipt handle is an opaque, often URL-unsafe blob — accepting it in
-    # a POST body avoids the escaping problems a DELETE-with-path-param
-    # (or DELETE-with-body, which not every HTTP client supports cleanly)
-    # would run into.
+    # A receipt handle is an opaque blob that's often not URL-safe, so it
+    # goes in a POST body instead of a path param — saves us the escaping
+    # headaches, and DELETE-with-a-body isn't reliably supported everywhere
+    # anyway.
     sqs.delete_message(name, body.receipt_handle)

@@ -10,12 +10,12 @@ router = APIRouter(tags=["health"])
 
 @router.get("/health")
 def health(provider: ProviderDep) -> dict:
-    """Liveness + provider connectivity check (Phase 1.1).
+    """Liveness + provider connectivity check.
 
-    A cheap, harmless S3 call (ListBuckets) is used as the connectivity
-    probe rather than just returning 200 unconditionally — a container that
-    boots fine but can't actually reach LocalStack/AWS should report
-    unhealthy, not "ok".
+    Actually probes the provider with a cheap, harmless S3 call
+    (ListBuckets) instead of just returning 200 unconditionally — a
+    container that boots fine but can't reach LocalStack/AWS should say
+    so, not report "ok".
     """
     try:
         provider.get_client("s3").list_buckets()
