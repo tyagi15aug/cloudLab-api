@@ -16,8 +16,13 @@ from __future__ import annotations
 from fastapi import APIRouter, Query, status
 
 from app.core.errors import AppError, ErrorCode
-from app.core.operations import OperationRecord, operation_recorder
-from app.models.operations import OperationList, OperationMetrics, OperationResource
+from app.core.operations import OperationMetricsSnapshot, OperationRecord, operation_recorder
+from app.models.operations import (
+    OperationList,
+    OperationMetrics,
+    OperationMetricsByOperation,
+    OperationResource,
+)
 
 router = APIRouter(prefix="/api/dev/operations", tags=["dev"])
 
@@ -38,6 +43,25 @@ def _to_resource(record: OperationRecord) -> OperationResource:
     )
 
 
+def _to_metrics_resource(snapshot: OperationMetricsSnapshot) -> OperationMetrics:
+    return OperationMetrics(
+        total_count=snapshot.total_count,
+        error_count=snapshot.error_count,
+        error_rate=snapshot.error_rate,
+        avg_duration_ms=snapshot.avg_duration_ms,
+        by_operation=[
+            OperationMetricsByOperation(
+                service=entry.service,
+                operation=entry.operation,
+                count=entry.count,
+                error_count=entry.error_count,
+                avg_duration_ms=entry.avg_duration_ms,
+            )
+            for entry in snapshot.by_operation
+        ],
+    )
+
+
 @router.get("", response_model=OperationList)
 def list_operations(limit: int = Query(default=50, ge=1, le=200)) -> OperationList:
     return OperationList(items=[_to_resource(r) for r in operation_recorder.list_recent(limit=limit)])
@@ -45,7 +69,7 @@ def list_operations(limit: int = Query(default=50, ge=1, le=200)) -> OperationLi
 
 @router.get("/metrics", response_model=OperationMetrics)
 def get_metrics() -> OperationMetrics:
-    return OperationMetrics(**operation_recorder.metrics())
+    return _to_metrics_resource(operation_recorder.metrics())
 
 
 @router.get("/{operation_id}", response_model=OperationResource)

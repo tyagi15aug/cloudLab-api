@@ -25,38 +25,51 @@ step() { echo; echo "==> $1"; }
 # Backend: lint, types, unit + integration tests. None of this needs Docker
 # — unit tests use moto's in-process mock, integration tests spin up their
 # own moto.server subprocess (see tests/integration/conftest.py).
+#
+# Everything below runs through a repo-local .venv rather than whatever
+# `python3`/`pip`/`ruff`/`mypy` happen to resolve first on PATH. Different
+# terminals (iTerm, Terminal.app, VS Code's integrated one, etc.) can each
+# have their own shell startup files and their own accumulated global pip
+# installs, so plain `ruff`/`mypy` can silently point at different versions
+# depending on where you run this from — a pinned .venv makes the result
+# the same everywhere, every time, regardless of which shell invoked it.
 # ---------------------------------------------------------------------------
+step "Backend: setting up .venv"
+[[ -d .venv ]] || python3 -m venv .venv
+VENV_BIN="$(pwd)/.venv/bin"
+
 step "Backend: installing dependencies"
-pip install -r requirements-dev.txt -q
+"$VENV_BIN/pip" install -r requirements-dev.txt -q
 
 step "Backend: lint (ruff check)"
-ruff check .
+"$VENV_BIN/ruff" check .
 
 step "Backend: format check (ruff format --check)"
-ruff format --check .
+"$VENV_BIN/ruff" format --check .
 
 step "Backend: type check (mypy)"
-mypy app --ignore-missing-imports
+"$VENV_BIN/mypy" app --ignore-missing-imports
 
 step "Backend: unit tests (moto, no Docker)"
-python3 -m pytest tests --ignore=tests/integration --cov=app --cov-report=term-missing
+"$VENV_BIN/python3" -m pytest tests --ignore=tests/integration --cov=app --cov-report=term-missing
 
 step "Backend: integration tests (moto.server, no Docker)"
-python3 -m pytest tests/integration -v
+"$VENV_BIN/python3" -m pytest tests/integration -v
 
 # ---------------------------------------------------------------------------
 # CLI (Phase 7): a separate installable package, zero third-party deps.
 # ruff/ruff format above already cover cli/ (they run against the whole
 # repo); mypy is scoped separately since cli/cloudctl is its own package.
+# Installed into the same .venv as the backend, for the same reason.
 # ---------------------------------------------------------------------------
 step "CLI: installing cloudctl"
-pip install -e cli/ -q
+"$VENV_BIN/pip" install -e cli/ -q
 
 step "CLI: type check (mypy)"
-mypy cli/cloudctl --ignore-missing-imports
+"$VENV_BIN/mypy" cli/cloudctl --ignore-missing-imports
 
 step "CLI: tests"
-(cd cli && python3 -m pytest tests -v)
+(cd cli && "$VENV_BIN/python3" -m pytest tests -v)
 
 # ---------------------------------------------------------------------------
 # Frontend: lint, types, build, unit tests. None of this needs a running

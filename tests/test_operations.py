@@ -24,11 +24,11 @@ def test_empty_recorder_has_no_history_and_zeroed_metrics():
     recorder = OperationRecorder()
     assert recorder.list_recent() == []
     metrics = recorder.metrics()
-    assert metrics["total_count"] == 0
-    assert metrics["error_count"] == 0
-    assert metrics["error_rate"] == 0.0
-    assert metrics["avg_duration_ms"] == 0.0
-    assert metrics["by_operation"] == []
+    assert metrics.total_count == 0
+    assert metrics.error_count == 0
+    assert metrics.error_rate == 0.0
+    assert metrics.avg_duration_ms == 0.0
+    assert metrics.by_operation == []
 
 
 def test_list_recent_returns_newest_first():
@@ -94,10 +94,10 @@ def test_metrics_counts_totals_and_error_rate():
     _record(recorder, status="error", duration_ms=30.0, error="INTERNAL_ERROR", retryable=False)
 
     metrics = recorder.metrics()
-    assert metrics["total_count"] == 3
-    assert metrics["error_count"] == 1
-    assert metrics["error_rate"] == round(1 / 3, 4)
-    assert metrics["avg_duration_ms"] == 20.0  # (10+20+30)/3
+    assert metrics.total_count == 3
+    assert metrics.error_count == 1
+    assert metrics.error_rate == round(1 / 3, 4)
+    assert metrics.avg_duration_ms == 20.0  # (10+20+30)/3
 
 
 def test_metrics_totals_survive_ring_buffer_eviction():
@@ -109,7 +109,7 @@ def test_metrics_totals_survive_ring_buffer_eviction():
         _record(recorder, status="success", duration_ms=10.0)
 
     assert len(recorder.list_recent(limit=10)) == 2
-    assert recorder.metrics()["total_count"] == 5
+    assert recorder.metrics().total_count == 5
 
 
 def test_metrics_breaks_down_by_service_and_operation():
@@ -118,14 +118,14 @@ def test_metrics_breaks_down_by_service_and_operation():
     _record(recorder, service="s3", operation="ListBuckets", duration_ms=30.0)
     _record(recorder, service="sqs", operation="ListQueues", duration_ms=5.0)
 
-    by_operation = {(e["service"], e["operation"]): e for e in recorder.metrics()["by_operation"]}
+    by_operation = {(e.service, e.operation): e for e in recorder.metrics().by_operation}
 
     s3_list = by_operation[("s3", "ListBuckets")]
-    assert s3_list["count"] == 2
-    assert s3_list["avg_duration_ms"] == 20.0
+    assert s3_list.count == 2
+    assert s3_list.avg_duration_ms == 20.0
 
     sqs_list = by_operation[("sqs", "ListQueues")]
-    assert sqs_list["count"] == 1
+    assert sqs_list.count == 1
 
 
 def test_by_operation_sorted_by_count_descending():
@@ -135,9 +135,9 @@ def test_by_operation_sorted_by_count_descending():
     _record(recorder, service="sqs", operation="ListQueues")
     _record(recorder, service="sqs", operation="ListQueues")
 
-    by_operation = recorder.metrics()["by_operation"]
-    assert by_operation[0]["operation"] == "ListQueues"
-    assert by_operation[0]["count"] == 3
+    by_operation = recorder.metrics().by_operation
+    assert by_operation[0].operation == "ListQueues"
+    assert by_operation[0].count == 3
 
 
 def test_clear_resets_history_and_metrics():
@@ -148,8 +148,8 @@ def test_clear_resets_history_and_metrics():
 
     assert recorder.list_recent() == []
     metrics = recorder.metrics()
-    assert metrics["total_count"] == 0
-    assert metrics["by_operation"] == []
+    assert metrics.total_count == 0
+    assert metrics.by_operation == []
 
 
 def test_default_max_history_matches_module_constant():
@@ -158,7 +158,7 @@ def test_default_max_history_matches_module_constant():
         _record(recorder)
 
     assert len(recorder.list_recent(limit=MAX_HISTORY + 10)) == MAX_HISTORY
-    assert recorder.metrics()["total_count"] == MAX_HISTORY + 10
+    assert recorder.metrics().total_count == MAX_HISTORY + 10
 
 
 def test_records_carry_request_id_and_retryable_flag_through():

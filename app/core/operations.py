@@ -54,6 +54,33 @@ class _OperationStats:
     duration_sum_ms: float = 0.0
 
 
+@dataclass
+class OperationTypeMetrics:
+    """One row of the per-service/operation breakdown `metrics()` returns."""
+
+    service: str
+    operation: str
+    count: int
+    error_count: int
+    avg_duration_ms: float
+
+
+@dataclass
+class OperationMetricsSnapshot:
+    """What `metrics()` returns — mirrors `OperationRecord`'s role for
+    `list_recent()`/`get()`: an internal, precisely-typed representation
+    that the route layer converts to the wire model (`OperationMetrics`
+    in app/models/operations.py). Kept as a real dataclass rather than a
+    plain dict so mypy can actually check the conversion at the route,
+    instead of everything downstream being `object`."""
+
+    total_count: int
+    error_count: int
+    error_rate: float
+    avg_duration_ms: float
+    by_operation: list[OperationTypeMetrics]
+
+
 class OperationRecorder:
     """A ring buffer of recent operations for the whole process, plus
     running totals per operation.
@@ -123,31 +150,29 @@ class OperationRecorder:
                     return record
         return None
 
-    def metrics(self) -> dict[str, object]:
+    def metrics(self) -> OperationMetricsSnapshot:
         with self._lock:
             total = self._totals.count
             errors = self._totals.error_count
             duration_sum = self._totals.duration_sum_ms
-            by_operation: list[dict[str, str | int | float]] = [
-                {
-                    "service": service,
-                    "operation": operation,
-                    "count": stats.count,
-                    "error_count": stats.error_count,
-                    "avg_duration_ms": (
-                        round(stats.duration_sum_ms / stats.count, 2) if stats.count else 0.0
-                    ),
-                }
+            by_operation = [
+                OperationTypeMetrics(
+                    service=service,
+                    operation=operation,
+                    count=stats.count,
+                    error_count=stats.error_count,
+                    avg_duration_ms=(round(stats.duration_sum_ms / stats.count, 2) if stats.count else 0.0),
+                )
                 for (service, operation), stats in self._by_operation.items()
             ]
-        by_operation.sort(key=lambda entry: int(entry["count"]), reverse=True)
-        return {
-            "total_count": total,
-            "error_count": errors,
-            "error_rate": round(errors / total, 4) if total else 0.0,
-            "avg_duration_ms": round(duration_sum / total, 2) if total else 0.0,
-            "by_operation": by_operation,
-        }
+        by_operation.sort(key=lambda entry: entry.count, reverse=True)
+        return OperationMetricsSnapshot(
+            total_count=total,
+            error_count=errors,
+            error_rate=round(errors / total, 4) if total else 0.0,
+            avg_duration_ms=round(duration_sum / total, 2) if total else 0.0,
+            by_operation=by_operation,
+        )
 
     def clear(self) -> None:
         with self._lock:

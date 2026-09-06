@@ -218,6 +218,7 @@ docker-compose.yml
 ## Tests
 
 ```bash
+python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
 pytest tests --ignore=tests/integration --cov=app   # 133 unit tests
 pytest tests/integration -v                          # 13 integration tests
@@ -225,6 +226,14 @@ ruff check .                 # lint
 ruff format --check .        # formatting
 mypy app --ignore-missing-imports
 ```
+
+Use the `.venv` here rather than whatever `ruff`/`mypy`/`pytest` your shell
+already has on `PATH` — a different terminal or shell profile can easily
+have a different (older or newer) global install shadowing the one this
+project actually pins, and `ruff`/`mypy` do change rule behavior across
+versions. `scripts/verify-all.sh` creates and uses this same `.venv`
+automatically, so it gives identical results no matter which terminal you
+run it from.
 
 **Unit tests** (`tests/*.py`) run against [moto](https://github.com/getmoto/moto)'s
 in-process AWS mock rather than a real LocalStack container — sub-second,
