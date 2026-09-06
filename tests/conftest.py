@@ -5,9 +5,22 @@ import pytest
 from fastapi.testclient import TestClient
 from moto import mock_aws
 
+from app.core.failure_injection import failure_injector
 from app.main import app
 from app.providers.base import CloudProvider
 from app.providers.factory import get_provider
+
+
+@pytest.fixture(autouse=True)
+def _reset_failure_injector():
+    """The failure injector (Phase 4) is a process-wide singleton — see
+    app/core/failure_injection.py. Without this, a rule added by one test
+    would leak into every test that runs after it in the same pytest
+    process, exactly the kind of cross-test state moto's `mock_aws()` and
+    the integration suite's `/moto-api/reset` already guard against."""
+    failure_injector.clear()
+    yield
+    failure_injector.clear()
 
 
 class FakeProvider(CloudProvider):

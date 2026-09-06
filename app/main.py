@@ -10,6 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.api.routes_dev import router as dev_router
 from app.api.routes_dynamodb import router as dynamodb_router
 from app.api.routes_health import router as health_router
 from app.api.routes_s3 import router as s3_router
@@ -155,6 +156,7 @@ def create_app() -> FastAPI:
     app.include_router(s3_router)
     app.include_router(sqs_router)
     app.include_router(dynamodb_router)
+    app.include_router(dev_router)
 
     return app
 

@@ -82,3 +82,28 @@ def test_validation_error_shape_over_real_app(live_app_client: TestClient) -> No
     body = response.json()
     assert body["error"]["code"] == "VALIDATION_ERROR"
     assert "requestId" in body["error"]
+
+
+def test_failure_injection_works_against_the_real_localstack_provider(live_app_client: TestClient) -> None:
+    """The failure injector (Phase 4) hooks ProviderService._call(), which
+    every service subclass shares — this proves it works identically when
+    the provider underneath is the real LocalStackProvider talking over a
+    real socket, not just the FakeProvider the rest of the unit suite uses.
+    """
+    created = live_app_client.post(
+        "/api/dev/failures",
+        json={"service": "s3", "operation": "CreateBucket", "failure": "http_500"},
+    )
+    assert created.status_code == 201
+
+    failed = live_app_client.post("/api/resources/s3/buckets", json={"name": "injected-failure-bucket"})
+    assert failed.status_code == 500
+    assert failed.json()["error"]["code"] == "INTERNAL_ERROR"
+
+    # The real CreateBucket call to moto's server never went out.
+    listed = live_app_client.get("/api/resources/s3/buckets")
+    assert listed.json()["items"] == []
+
+    live_app_client.delete("/api/dev/failures")
+    succeeded = live_app_client.post("/api/resources/s3/buckets", json={"name": "injected-failure-bucket"})
+    assert succeeded.status_code == 201

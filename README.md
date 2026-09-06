@@ -9,9 +9,13 @@ design and phase plan.
 The React console lives in the sibling [`cloud-control-plane-web`](../cloud-control-plane-web)
 repo.
 
-**Status:** Phases 1–3 complete — LocalStack, the provider abstraction,
+**Status:** Phases 1–4 complete — LocalStack, the provider abstraction,
 S3/SQS/DynamoDB backends, the React console, unit + integration + E2E
-tests, and CI are all in place. See that repo's README for the frontend.
+tests, and CI are all in place, plus a dev-only failure-injection layer
+(`/api/dev/failures`) that can make any resource operation return an
+HTTP 500/403, time out, throttle, add artificial latency, or fail to
+connect — on demand, for resilience testing. See that repo's README for
+the frontend, and "Phase 4" below for the design.
 
 ## Prerequisites
 
@@ -109,6 +113,10 @@ Route (app/api/routes_{s3,sqs,dynamodb}.py)
   `TypeSerializer` rejects native Python floats outright ("Use Decimal
   types instead"), which would 400 every item with a decimal value coming
   from a JSON request body without an explicit float→Decimal conversion.
+- **Failure injection** (`app/core/failure_injection.py`, Phase 4): an
+  in-memory, process-wide, thread-safe registry of failure rules that
+  `ProviderService._call()` consults before every real provider call — see
+  "Phase 4" below.
 
 ## Configuration
 
@@ -147,7 +155,15 @@ DELETE /api/resources/dynamodb/tables/{name}
 GET    /api/resources/dynamodb/tables/{name}/items?page_size=&cursor=
 POST   /api/resources/dynamodb/tables/{name}/items     {"item": {...}}
 POST   /api/resources/dynamodb/tables/{name}/items/delete {"key": {...}}
+
+GET    /api/dev/failures
+POST   /api/dev/failures    {"service", "operation", "failure", "delay_ms"?, "probability"?}
+DELETE /api/dev/failures
+DELETE /api/dev/failures/{rule_id}
 ```
+
+The `/api/dev/failures` routes are deliberately unauthenticated — see
+"Phase 4" below.
 
 Message/item deletion use a `POST .../delete` action route rather than
 `DELETE` with a path param — a receipt handle or a composite DynamoDB key
@@ -158,15 +174,15 @@ isn't a clean single URL segment (see the docstrings on
 
 ```text
 app/
-  api/        routes + dependency wiring (routes_s3, routes_sqs, routes_dynamodb)
-  core/       config, structured logging, error model
-  models/     pydantic resource/error schemas (resource, sqs, dynamodb)
+  api/        routes + dependency wiring (routes_s3, routes_sqs, routes_dynamodb, routes_dev)
+  core/       config, structured logging, error model, failure_injection.py (Phase 4)
+  models/     pydantic resource/error schemas (resource, sqs, dynamodb, failure_injection)
   providers/  CloudProvider abstraction (LocalStack/AWS)
   services/   base.py (shared ProviderService), pagination.py, and one
               service per resource (s3, sqs, dynamodb)
 tests/
-  test_*.py         unit tests (moto in-process mock) — 78 tests
-  integration/      Phase 2.2 — real HTTP against a moto-server process — 11 tests
+  test_*.py         unit tests (moto in-process mock) — 107 tests
+  integration/      Phase 2.2 — real HTTP against a moto-server process — 12 tests
 docs/
   implementation-plan.md
 infrastructure/
@@ -181,8 +197,8 @@ docker-compose.yml
 
 ```bash
 pip install -r requirements-dev.txt
-pytest tests --ignore=tests/integration --cov=app   # 78 unit tests
-pytest tests/integration -v                          # 11 integration tests
+pytest tests --ignore=tests/integration --cov=app   # 107 unit tests
+pytest tests/integration -v                          # 12 integration tests
 ruff check .                 # lint
 ruff format --check .        # formatting
 mypy app --ignore-missing-imports
@@ -259,6 +275,52 @@ format ("Float types are not supported. Use Decimal types instead.") —
 every item with a decimal value in its JSON request body would have 400'd
 without an explicit `float -> Decimal` conversion in
 `dynamodb_service.py#_to_dynamo_compatible`.
+
+## Phase 4 — Failure Injection
+
+Phase 4's goal (Section 13 of the plan) was a real failure source the UI
+and E2E suite could drive on demand, with the core guarantee that no
+injected failure can leave the UI permanently stuck:
+
+- **No new layer — reuse the existing seam.** Every resource operation
+  already funnels through `ProviderService._call()` (Phase 3's shared
+  base class, added for logging + error translation). Failure injection
+  is a single extra line there —
+  `failure_injector.apply(service=self.service_name, operation=operation)`
+  before the real boto3 call — so `S3Service`, `SqsService`, and
+  `DynamoDbService` needed zero changes to gain it.
+- **`FailureInjector`** (`app/core/failure_injection.py`) is an in-memory,
+  process-wide singleton guarded by a `threading.Lock()` — FastAPI runs
+  sync route handlers in a thread pool, so concurrent add/list/apply calls
+  are a real race, not a theoretical one. Rules aren't persisted and reset
+  on process restart; that's intentional for a dev tool, not a shortcut.
+- **Matching**: a rule's `service`/`operation` can each be `"*"` to match
+  anything, so one rule can express "fail every SQS operation." Rules also
+  carry `probability` (0.0–1.0, for flaky-not-broken scenarios) and
+  `delay_ms` (0–30,000, clamped) to add latency before the failure fires
+  — or before a non-failure returns, for the `latency` type.
+- **Six failure types**, one meaningful distinction among them: `http_500`,
+  `http_403`, `throttle`, and `connection_failure` all raise immediately
+  after any configured delay. `timeout` also raises (a retryable
+  `PROVIDER_UNAVAILABLE`) but only after its delay — simulating a call
+  that was slow *and* ultimately failed. `latency` is the odd one out: it
+  delays and then lets the real call proceed and succeed, for testing
+  that a merely-slow response doesn't misrender as an error.
+- **Unauthenticated, on purpose, for now** — `/api/dev/failures` is
+  namespaced away from `/api/resources/...` specifically so it's easy to
+  gate behind auth later (Phase 9 in the plan) without touching resource
+  routes. This is a dev/test tool, not something to expose as-is in a
+  production deployment.
+- **Testing it at every layer**: `tests/test_failure_injection.py` (15
+  tests) covers the registry in isolation — every failure type's exact
+  `(code, status, retryable)` triple, wildcard matching, probability edge
+  cases, clamping. `tests/test_routes_dev.py` (13 tests) drives the real
+  routes against the `FakeProvider`/moto setup, including proving an
+  injected failure genuinely short-circuits the real operation (e.g. a
+  bucket that was supposed to be created never is). One integration test
+  in `tests/integration/test_app_lifecycle.py` does the same against the
+  real `LocalStackProvider` and a real moto-server socket, to rule out
+  anything moto's in-process mock might paper over.
 
 ## E2E tests
 

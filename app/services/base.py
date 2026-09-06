@@ -15,7 +15,8 @@ from typing import TypeVar
 
 from botocore.exceptions import BotoCoreError, ClientError
 
-from app.core.errors import translate_boto_error
+from app.core.errors import AppError, translate_boto_error
+from app.core.failure_injection import failure_injector
 from app.core.logging import elapsed_ms, log_operation, timed_ms
 from app.providers.base import CloudProvider
 
@@ -43,7 +44,27 @@ class ProviderService:
     def _call(self, operation: str, fn: Callable[[], T], *, resource: str | None = None) -> T:
         start = timed_ms()
         try:
+            # Phase 4: consulted before every real provider call so any
+            # resource service gets failure injection for free — see
+            # app/core/failure_injection.py. Raises AppError directly (for
+            # every failure type except pure LATENCY, which just delays)
+            # rather than a botocore exception, since there's no real AWS
+            # call to fail; the `except AppError` branch below logs it
+            # exactly like a translated real error.
+            failure_injector.apply(service=self.service_name, operation=operation)
             result = fn()
+        except AppError as exc:
+            log_operation(
+                self._logger,
+                operation=operation,
+                service=self.service_name,
+                provider=self._provider.name,
+                duration_ms=elapsed_ms(start),
+                status="error",
+                resource=resource,
+                error=exc.code.value,
+            )
+            raise
         except (ClientError, BotoCoreError) as exc:
             app_error = translate_boto_error(exc, resource=resource)
             log_operation(
