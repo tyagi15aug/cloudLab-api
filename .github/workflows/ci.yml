@@ -38,5 +38,17 @@ jobs:
         # tests/integration/conftest.py for why).
         run: pytest tests/integration -v
 
+      - name: CLI - install cloudctl
+        # Separate installable package (Phase 7, cli/) — zero third-party
+        # dependencies, see cli/README.md.
+        run: pip install -e cli/
+
+      - name: CLI - type check
+        run: mypy cli/cloudctl --ignore-missing-imports
+
+      - name: CLI - tests
+        working-directory: cli
+        run: pytest tests -v
+
       - name: Build Docker image
         run: docker build -t cloud-control-plane-api .

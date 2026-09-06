@@ -9,15 +9,19 @@ design and phase plan.
 The React console lives in the sibling [`cloud-control-plane-web`](../cloud-control-plane-web)
 repo.
 
-**Status:** Phases 1–5 complete — LocalStack, the provider abstraction,
-S3/SQS/DynamoDB backends, the React console, unit + integration + E2E
-tests, and CI are all in place, plus a dev-only failure-injection layer
-(`/api/dev/failures`) that can make any resource operation return an
-HTTP 500/403, time out, throttle, add artificial latency, or fail to
-connect — on demand, for resilience testing — and a dev-only operation
-history/metrics layer (`/api/dev/operations`) recording every resource
-call's request ID, duration, status, and error. See that repo's README
-for the frontend, and "Phase 4"/"Phase 5" below for the design.
+**Status:** Phases 1–5 and 7 complete — LocalStack, the provider
+abstraction, S3/SQS/DynamoDB backends, the React console, unit +
+integration + E2E tests, and CI are all in place, plus a dev-only
+failure-injection layer (`/api/dev/failures`) that can make any resource
+operation return an HTTP 500/403, time out, throttle, add artificial
+latency, or fail to connect — on demand, for resilience testing — a
+dev-only operation history/metrics layer (`/api/dev/operations`)
+recording every resource call's request ID, duration, status, and error,
+and a `cloudctl` developer CLI (`cli/`) wrapping both. See that repo's
+README for the frontend, and "Phase 4"/"Phase 5"/"Phase 7" below for the
+design. Phase 6 (AI-assisted CI log analysis) is deliberately deferred
+until after Phase 7 — there's little to analyze until the CLI/CI story
+below is in place and producing real runs.
 
 ## Prerequisites
 
@@ -194,11 +198,12 @@ app/
 tests/
   test_*.py         unit tests (moto in-process mock) — 133 tests
   integration/      Phase 2.2 — real HTTP against a moto-server process — 13 tests
+cli/                Phase 7 — the cloudctl developer CLI (separate installable package, see cli/README.md)
 docs/
   implementation-plan.md
 infrastructure/
 scripts/
-  dev-up.sh, seed.sh, dev-down.sh, reset.sh
+  dev-up.sh, seed.sh, dev-down.sh, reset.sh, verify-all.sh
 .github/workflows/ci.yml
 docker-compose.yml
 .env.example
@@ -247,10 +252,25 @@ non-default region to actually exercise the conflict-mapping code path.
 ./scripts/seed.sh         # (re-)create the plan's Section 12.1 demo resources
 ./scripts/dev-down.sh     # docker compose down (--volumes to also drop LocalStack state)
 ./scripts/reset.sh        # drop LocalStack state and bring the stack back up + reseeded
+./scripts/verify-all.sh   # everything both CI jobs do, locally, in one command (see below)
 ```
 
 `seed.sh` creates: S3 `demo-assets`/`test-bucket`, SQS `orders`/`notifications`,
 DynamoDB `users`/`orders` (both partitioned on `id`).
+
+`verify-all.sh` runs the backend lint/format/type-check/unit/integration
+suite, then the sibling `cloud-control-plane-web` repo's lint/type-check/
+unit-tests/build, then brings up the real `docker compose` stack and runs
+the Playwright E2E suite against it — the same steps `.github/workflows/ci.yml`
+runs across its two jobs, in one local command. Requires
+`cloud-control-plane-web` cloned as a sibling directory. Flags:
+`--keep-up` leaves the Docker stack running afterward instead of tearing
+it down; `SKIP_E2E=1 ./scripts/verify-all.sh` skips Docker and Playwright
+entirely (e.g. no Docker on this machine — everything else still runs).
+
+All five scripts above are also reachable through `cloudctl` (Phase 7,
+see below) as `up`/`seed`/`down`/`reset`/`test` — `cloudctl` delegates to
+these same scripts rather than reimplementing them.
 
 ## Phase 3 — SQS, DynamoDB, and the resource-service base class
 
@@ -377,6 +397,48 @@ Phase 1; this phase adds the developer-facing history and metrics on top:
   integration test in `tests/integration/test_app_lifecycle.py` proves the
   same against a real `LocalStackProvider` and a real moto-server socket.
 
+## Phase 7 — CLI / Developer Experience
+
+Phase 7's objective (Section 7 of the plan): "turn the project into a
+developer tool rather than only a web application." `cli/` is a small,
+separately-installable Python package (`pip install -e cli/`) exposing a
+`cloudctl` command:
+
+```bash
+cloudctl up                                    # start stack, seed demo data
+cloudctl seed / reset / down [--volumes]
+cloudctl status                                # container status + API health
+cloudctl logs [service] [-f]
+cloudctl resources [--service s3|sqs|dynamodb] # list everything via the real API
+cloudctl failure list / inject <svc> <op> <failure> / clear / delete <id>
+cloudctl test [--skip-e2e] [--keep-up]         # scripts/verify-all.sh
+```
+
+- **The design principle (plan Section 7.2 — "call the same application
+  APIs/services where practical, avoid a completely separate
+  implementation") is applied deliberately in two directions**, documented
+  in full in `cli/README.md`: `up`/`down`/`seed`/`reset`/`test` delegate
+  to this repo's own `scripts/*.sh` by subprocess, since those already are
+  the one correct implementation of "start the stack" / "wait for health"
+  / "seed data" — rewriting that in Python would create a second,
+  competing implementation instead of avoiding one. `resources` and
+  `failure *` have no other implementation anywhere to reuse, so they're
+  thin HTTP calls to the real API (`cli/cloudctl/client.py`) — the same
+  endpoints the React console calls.
+- **Zero third-party dependencies.** `cloudctl` uses only `urllib`,
+  `subprocess`, `argparse`, and `pathlib`. See `cli/README.md`'s "Why
+  stdlib-only" note.
+- **Runs from anywhere in the repo.** `find_project_root()`
+  (`cli/cloudctl/compose.py`) walks upward from the current directory
+  looking for `docker-compose.yml` next to `scripts/`, the same way `git`
+  finds `.git`; `CLOUDCTL_PROJECT_ROOT` overrides it for running against a
+  checkout elsewhere.
+- **Tested with everything external mocked out** — 30 tests across
+  `cli/tests/`, none of which touch Docker, a real script, or a real HTTP
+  server (`find_project_root`/`run_script`/`compose`/`ApiClient` are all
+  patched at the call site). `ruff`/`ruff format`/`mypy` from the repo
+  root cover `cli/` too.
+
 ## E2E tests
 
 The `cloud-control-plane-web` repo's `tests/e2e/` (Playwright) drives the
@@ -387,5 +449,5 @@ those tests expect.
 ## CI
 
 `.github/workflows/ci.yml` runs lint, format check, type check, the unit
-test suite (with coverage), the integration test suite, and a Docker build
-on every push/PR to `main`.
+test suite (with coverage), the integration test suite, a Docker build,
+and the `cloudctl` CLI's own test suite, on every push/PR to `main`.
