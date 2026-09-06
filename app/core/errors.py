@@ -133,7 +133,7 @@ def translate_boto_error(exc: Exception, *, resource: str | None = None) -> AppE
             cause=exc,
         )
 
-    if isinstance(exc, (EndpointConnectionError, BotoConnectionError)):
+    if isinstance(exc, EndpointConnectionError | BotoConnectionError):
         return AppError(
             ErrorCode.PROVIDER_UNAVAILABLE,
             "Could not reach the cloud provider endpoint.",
