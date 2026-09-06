@@ -9,13 +9,15 @@ design and phase plan.
 The React console lives in the sibling [`cloud-control-plane-web`](../cloud-control-plane-web)
 repo.
 
-**Status:** Phases 1–4 complete — LocalStack, the provider abstraction,
+**Status:** Phases 1–5 complete — LocalStack, the provider abstraction,
 S3/SQS/DynamoDB backends, the React console, unit + integration + E2E
 tests, and CI are all in place, plus a dev-only failure-injection layer
 (`/api/dev/failures`) that can make any resource operation return an
 HTTP 500/403, time out, throttle, add artificial latency, or fail to
-connect — on demand, for resilience testing. See that repo's README for
-the frontend, and "Phase 4" below for the design.
+connect — on demand, for resilience testing — and a dev-only operation
+history/metrics layer (`/api/dev/operations`) recording every resource
+call's request ID, duration, status, and error. See that repo's README
+for the frontend, and "Phase 4"/"Phase 5" below for the design.
 
 ## Prerequisites
 
@@ -104,8 +106,8 @@ Route (app/api/routes_{s3,sqs,dynamodb}.py)
 - **Structured logging** (`app/core/logging.py`): every request and every
   provider operation is logged as one JSON line, tagged with the request's
   `request_id` automatically via a contextvar — the same shape Phase 5's
-  operation history and Phase 6's CI log analyzer are meant to consume
-  later.
+  operation history (below) and Phase 6's CI log analyzer are meant to
+  consume.
 - **DynamoDB item conversion** (`app/services/dynamodb_service.py`): items
   are plain JSON above this service — it's the only place in the codebase
   that knows DynamoDB's typed `AttributeValue` wire format
@@ -117,6 +119,10 @@ Route (app/api/routes_{s3,sqs,dynamodb}.py)
   in-memory, process-wide, thread-safe registry of failure rules that
   `ProviderService._call()` consults before every real provider call — see
   "Phase 4" below.
+- **Operation history** (`app/core/operations.py`, Phase 5): an in-memory,
+  process-wide, thread-safe ring buffer + metrics counters that
+  `ProviderService._call()` also records into after every real provider
+  call — see "Phase 5" below.
 
 ## Configuration
 
@@ -160,10 +166,15 @@ GET    /api/dev/failures
 POST   /api/dev/failures    {"service", "operation", "failure", "delay_ms"?, "probability"?}
 DELETE /api/dev/failures
 DELETE /api/dev/failures/{rule_id}
+
+GET    /api/dev/operations?limit=
+GET    /api/dev/operations/metrics
+GET    /api/dev/operations/{operation_id}
+DELETE /api/dev/operations
 ```
 
-The `/api/dev/failures` routes are deliberately unauthenticated — see
-"Phase 4" below.
+The `/api/dev/failures` and `/api/dev/operations` routes are deliberately
+unauthenticated — see "Phase 4"/"Phase 5" below.
 
 Message/item deletion use a `POST .../delete` action route rather than
 `DELETE` with a path param — a receipt handle or a composite DynamoDB key
@@ -174,15 +185,15 @@ isn't a clean single URL segment (see the docstrings on
 
 ```text
 app/
-  api/        routes + dependency wiring (routes_s3, routes_sqs, routes_dynamodb, routes_dev)
-  core/       config, structured logging, error model, failure_injection.py (Phase 4)
-  models/     pydantic resource/error schemas (resource, sqs, dynamodb, failure_injection)
+  api/        routes + dependency wiring (routes_s3, routes_sqs, routes_dynamodb, routes_dev, routes_operations)
+  core/       config, structured logging, error model, failure_injection.py (Phase 4), operations.py (Phase 5)
+  models/     pydantic resource/error schemas (resource, sqs, dynamodb, failure_injection, operations)
   providers/  CloudProvider abstraction (LocalStack/AWS)
   services/   base.py (shared ProviderService), pagination.py, and one
               service per resource (s3, sqs, dynamodb)
 tests/
-  test_*.py         unit tests (moto in-process mock) — 107 tests
-  integration/      Phase 2.2 — real HTTP against a moto-server process — 12 tests
+  test_*.py         unit tests (moto in-process mock) — 133 tests
+  integration/      Phase 2.2 — real HTTP against a moto-server process — 13 tests
 docs/
   implementation-plan.md
 infrastructure/
@@ -197,8 +208,8 @@ docker-compose.yml
 
 ```bash
 pip install -r requirements-dev.txt
-pytest tests --ignore=tests/integration --cov=app   # 107 unit tests
-pytest tests/integration -v                          # 12 integration tests
+pytest tests --ignore=tests/integration --cov=app   # 133 unit tests
+pytest tests/integration -v                          # 13 integration tests
 ruff check .                 # lint
 ruff format --check .        # formatting
 mypy app --ignore-missing-imports
@@ -321,6 +332,50 @@ injected failure can leave the UI permanently stuck:
   in `tests/integration/test_app_lifecycle.py` does the same against the
   real `LocalStackProvider` and a real moto-server socket, to rule out
   anything moto's in-process mock might paper over.
+
+## Phase 5 — Observability and Operation Debugging
+
+Phase 5's objective (Section 5 of the plan) was to make the system explain
+what happened. Request IDs and structured logging already existed from
+Phase 1; this phase adds the developer-facing history and metrics on top:
+
+- **Same seam, again.** `ProviderService._call()` already logs every
+  operation's outcome (Phase 1) and consults the failure injector before
+  it runs (Phase 4). Phase 5 adds one more call there —
+  `operation_recorder.record(...)` — right alongside the existing
+  `log_operation(...)` call, so every resource operation is recorded with
+  zero per-service code, matching Phase 4's "instrument the shared seam
+  once" pattern exactly.
+- **`OperationRecorder`** (`app/core/operations.py`) is an in-memory,
+  process-wide singleton guarded by a `threading.Lock()` — same reasoning
+  as `FailureInjector`. It keeps a bounded ring buffer (`deque(maxlen=200)`)
+  of recent operations for `/api/dev/operations` and `/{id}`, plus
+  separate cumulative counters (total count, error count, duration sum,
+  and a per-service/operation breakdown) that deliberately *don't* live in
+  the ring buffer, so `/api/dev/operations/metrics` stays accurate for the
+  process's whole lifetime even once more than 200 operations have
+  happened and older ones have aged out of history.
+- **An injected failure and a real one are recorded identically.** By the
+  time `_call()` reaches its `except AppError` branch, it can't tell
+  whether that `AppError` came from Phase 4's failure injector or a real
+  translated botocore exception — so both show up in operation history
+  with the same shape (status="error", the error's code, its `retryable`
+  flag). This is a feature, not a gap: the history panel reflects what
+  actually happened to the request, not a sanitized version of it.
+- **`/metrics` is registered before `/{operation_id}`** in
+  `routes_operations.py` specifically so a request for it is never
+  swallowed by the parameterized route — FastAPI/Starlette tries routes in
+  declaration order, and `/metrics` failing the `int` conversion `{operation_id}`
+  expects would otherwise matter if the order were reversed.
+- **Testing it at every layer**, mirroring Phase 4's structure:
+  `tests/test_operations.py` (14 tests) covers `OperationRecorder` in
+  isolation — ring-buffer eviction, metrics math, request-id/retryable
+  pass-through. `tests/test_routes_operations.py` (12 tests) drives the
+  real routes against the `FakeProvider` setup, including proving that
+  totals survive ring-buffer eviction and that both a failed and a
+  succeeded call on the same operation both count correctly. One
+  integration test in `tests/integration/test_app_lifecycle.py` proves the
+  same against a real `LocalStackProvider` and a real moto-server socket.
 
 ## E2E tests
 

@@ -17,7 +17,8 @@ from botocore.exceptions import BotoCoreError, ClientError
 
 from app.core.errors import AppError, translate_boto_error
 from app.core.failure_injection import failure_injector
-from app.core.logging import elapsed_ms, log_operation, timed_ms
+from app.core.logging import elapsed_ms, log_operation, request_id_ctx, timed_ms
+from app.core.operations import operation_recorder
 from app.providers.base import CloudProvider
 
 T = TypeVar("T")
@@ -43,6 +44,7 @@ class ProviderService:
 
     def _call(self, operation: str, fn: Callable[[], T], *, resource: str | None = None) -> T:
         start = timed_ms()
+        request_id = request_id_ctx.get()
         try:
             # Phase 4: consulted before every real provider call so any
             # resource service gets failure injection for free — see
@@ -54,38 +56,77 @@ class ProviderService:
             failure_injector.apply(service=self.service_name, operation=operation)
             result = fn()
         except AppError as exc:
+            duration_ms = elapsed_ms(start)
             log_operation(
                 self._logger,
                 operation=operation,
                 service=self.service_name,
                 provider=self._provider.name,
-                duration_ms=elapsed_ms(start),
+                duration_ms=duration_ms,
                 status="error",
                 resource=resource,
                 error=exc.code.value,
             )
+            # Phase 5: the same completed-operation event `log_operation`
+            # just emitted to stdout, additionally kept queryable over HTTP
+            # — see app/core/operations.py. An injected failure (above) and
+            # a real translated one (below) both land here identically,
+            # since by this point they're both just an AppError.
+            operation_recorder.record(
+                service=self.service_name,
+                operation=operation,
+                provider=self._provider.name,
+                status="error",
+                duration_ms=duration_ms,
+                request_id=request_id,
+                resource=resource,
+                error=exc.code.value,
+                retryable=exc.retryable,
+            )
             raise
         except (ClientError, BotoCoreError) as exc:
             app_error = translate_boto_error(exc, resource=resource)
+            duration_ms = elapsed_ms(start)
             log_operation(
                 self._logger,
                 operation=operation,
                 service=self.service_name,
                 provider=self._provider.name,
-                duration_ms=elapsed_ms(start),
+                duration_ms=duration_ms,
                 status="error",
                 resource=resource,
                 error=app_error.code.value,
             )
+            operation_recorder.record(
+                service=self.service_name,
+                operation=operation,
+                provider=self._provider.name,
+                status="error",
+                duration_ms=duration_ms,
+                request_id=request_id,
+                resource=resource,
+                error=app_error.code.value,
+                retryable=app_error.retryable,
+            )
             raise app_error from exc
         else:
+            duration_ms = elapsed_ms(start)
             log_operation(
                 self._logger,
                 operation=operation,
                 service=self.service_name,
                 provider=self._provider.name,
-                duration_ms=elapsed_ms(start),
+                duration_ms=duration_ms,
                 status="success",
+                resource=resource,
+            )
+            operation_recorder.record(
+                service=self.service_name,
+                operation=operation,
+                provider=self._provider.name,
+                status="success",
+                duration_ms=duration_ms,
+                request_id=request_id,
                 resource=resource,
             )
             return result

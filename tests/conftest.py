@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from moto import mock_aws
 
 from app.core.failure_injection import failure_injector
+from app.core.operations import operation_recorder
 from app.main import app
 from app.providers.base import CloudProvider
 from app.providers.factory import get_provider
@@ -21,6 +22,18 @@ def _reset_failure_injector():
     failure_injector.clear()
     yield
     failure_injector.clear()
+
+
+@pytest.fixture(autouse=True)
+def _reset_operation_recorder():
+    """Same reasoning as `_reset_failure_injector`, for Phase 5's
+    process-wide operation history (app/core/operations.py) — otherwise
+    every test's calls would pile up in one shared history and a test
+    asserting on `list_operations`/`metrics` counts would see operations
+    left over from whichever tests ran before it."""
+    operation_recorder.clear()
+    yield
+    operation_recorder.clear()
 
 
 class FakeProvider(CloudProvider):

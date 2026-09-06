@@ -107,3 +107,21 @@ def test_failure_injection_works_against_the_real_localstack_provider(live_app_c
     live_app_client.delete("/api/dev/failures")
     succeeded = live_app_client.post("/api/resources/s3/buckets", json={"name": "injected-failure-bucket"})
     assert succeeded.status_code == 201
+
+
+def test_operation_history_works_against_the_real_localstack_provider(live_app_client: TestClient) -> None:
+    """The operation recorder (Phase 5) hooks the same `ProviderService._call()`
+    seam as the failure injector — proving it records real calls against a
+    real moto-server socket the same way it does against the FakeProvider
+    the rest of the unit suite uses.
+    """
+    create = live_app_client.post("/api/resources/s3/buckets", json={"name": "history-bucket"})
+    request_id = create.headers["x-request-id"]
+
+    items = live_app_client.get("/api/dev/operations").json()["items"]
+    assert items[0]["operation"] == "CreateBucket"
+    assert items[0]["status"] == "success"
+    assert items[0]["request_id"] == request_id
+
+    metrics = live_app_client.get("/api/dev/operations/metrics").json()
+    assert metrics["total_count"] >= 1
