@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "cloudctl"
 version = "0.1.0"
 description = "Developer CLI for the Cloud Control Plane local environment (Phase 7)."
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = []
 
 # Deliberately zero third-party dependencies (see README.md's "Why

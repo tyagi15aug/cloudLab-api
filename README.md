@@ -26,7 +26,13 @@ below is in place and producing real runs.
 ## Prerequisites
 
 - Docker + Docker Compose
-- Python 3.12 (only needed for running the API outside Docker)
+- Python 3.10–3.13 (only needed for running the API outside Docker, or for
+  `scripts/verify-all.sh`/`cloudctl`). **Python 3.14 needs `pydantic>=2.12`**
+  — `pydantic-core` has no prebuilt wheel for 3.14 before that, so pip
+  falls back to a source build via PyO3, which fails outright since PyO3
+  doesn't support 3.14 yet. `requirements.txt` already pins a compatible
+  version; if you see a `maturin`/`cargo`/PyO3 build error installing
+  dependencies, check `python3 --version` first.
 
 ## Quickstart
 
