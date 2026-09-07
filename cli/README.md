@@ -1,6 +1,6 @@
 # cloudctl (Phase 7)
 
-A developer CLI for the Cloud Control Plane local environment — the plan's
+A developer CLI for the CloudLab local environment — the plan's
 Phase 7 objective: "turn the project into a developer tool rather than only
 a web application."
 
@@ -29,7 +29,7 @@ cloudctl test
 ## Install
 
 ```bash
-pip install -e cli/            # from the cloud-control-plane-api repo root
+pip install -e cli/            # from the cloudlab-api repo root
 cloudctl --version
 ```
 

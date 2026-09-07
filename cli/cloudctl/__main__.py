@@ -193,7 +193,7 @@ def cmd_failure_delete(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="cloudctl",
-        description="Developer CLI for the Cloud Control Plane local environment (Phase 7).",
+        description="Developer CLI for the CloudLab local environment.",
     )
     parser.add_argument("--version", action="version", version=f"cloudctl {__version__}")
     parser.add_argument(

@@ -1,4 +1,4 @@
-# Local Cloud Control Plane — Design & Implementation Plan
+# CloudLab — Design & Implementation Plan
 
 **Project type:** Full-stack cloud infrastructure management and testing platform  
 **Primary goal:** Build a locally runnable and publicly demoable AWS-like control plane that demonstrates senior-level frontend, backend, cloud, testing, CI/CD, observability, and AI-assisted engineering practices.
@@ -84,7 +84,7 @@ Developer CLI
 
 ## 3.1 Working concept
 
-A local cloud control plane for provisioning, inspecting, testing, and debugging AWS-style infrastructure without requiring access to real AWS resources.
+CloudLab: a local cloud control plane for provisioning, inspecting, testing, and debugging AWS-style infrastructure without requiring access to real AWS resources.
 
 ## 3.2 Primary users
 

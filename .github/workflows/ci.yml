@@ -51,4 +51,4 @@ jobs:
         run: pytest tests -v
 
       - name: Build Docker image
-        run: docker build -t cloud-control-plane-api .
+        run: docker build -t cloudlab-api .

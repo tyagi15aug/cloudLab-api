@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "cloudctl"
 version = "0.1.0"
-description = "Developer CLI for the Cloud Control Plane local environment (Phase 7)."
+description = "Developer CLI for the CloudLab local environment."
 requires-python = ">=3.10"
 dependencies = []
 

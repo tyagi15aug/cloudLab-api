@@ -1,6 +1,6 @@
 """HTTP client for cloudctl.
 
-Talks to the real Cloud Control Plane API over plain HTTP, stdlib
+Talks to the real CloudLab API over plain HTTP, stdlib
 `urllib` only — see cli/README.md's "Why stdlib-only" note. `resources`,
 `failure`, and `/health` have no script anywhere to lean on, so this is
 just a thin, honest client of the same endpoints the React console calls

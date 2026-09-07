@@ -1,4 +1,4 @@
-"""cloudctl — developer CLI for the Cloud Control Plane local environment.
+"""cloudctl — developer CLI for the CloudLab local environment.
 
 See cli/README.md for the reasoning: infra-lifecycle commands delegate to
 the repo's existing scripts/*.sh, and everything else talks to the real

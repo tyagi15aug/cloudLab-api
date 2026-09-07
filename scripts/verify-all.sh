@@ -4,7 +4,7 @@
 # whole project still work" after a change, without pushing and waiting on
 # GitHub Actions.
 #
-# Assumes this repo and cloud-control-plane-web are cloned as siblings on
+# Assumes this repo and cloudlab-ui are cloned as siblings on
 # disk (the project is deliberately two separate repos, not a monorepo).
 #
 # Usage:
@@ -13,9 +13,9 @@
 #   SKIP_E2E=1 ./scripts/verify-all.sh # skip Docker/Playwright entirely
 #                                       # (e.g. no Docker on this machine)
 set -euo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")/.."   # repo root (cloud-control-plane-api/)
+cd "$(dirname "${BASH_SOURCE[0]}")/.."   # repo root (cloudlab-api/)
 
-WEB_DIR="../cloud-control-plane-web"
+WEB_DIR="../cloudlab-ui"
 KEEP_UP=0
 [[ "${1:-}" == "--keep-up" ]] && KEEP_UP=1
 
@@ -77,7 +77,7 @@ step "CLI: tests"
 # ---------------------------------------------------------------------------
 if [[ ! -d "$WEB_DIR" ]]; then
   echo
-  echo "!! Sibling repo not found at $WEB_DIR — clone cloud-control-plane-web" >&2
+  echo "!! Sibling repo not found at $WEB_DIR — clone cloudlab-ui" >&2
   echo "   next to this repo to run frontend checks and E2E tests." >&2
   exit 1
 fi

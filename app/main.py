@@ -106,7 +106,7 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="Cloud Control Plane API", lifespan=lifespan)
+    app = FastAPI(title="CloudLab API", lifespan=lifespan)
 
     app.add_middleware(RequestIDMiddleware)
 
