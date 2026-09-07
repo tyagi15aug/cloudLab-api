@@ -1,0 +1,6 @@
+# Replace :80 with your real domain (e.g. api.yourname.dev) once DNS points
+# at this VM's IP -- Caddy then gets you free auto-renewing HTTPS with no
+# other changes. Until then this just serves plain HTTP on the VM's IP.
+:80 {
+	reverse_proxy api:8000
+}
