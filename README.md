@@ -1,4 +1,4 @@
-# cloudlab-api
+# cloudLab-api
 
 Backend for the CloudLab project — a locally runnable,
 AWS-console-style control plane backed by LocalStack, built as a full
@@ -6,7 +6,7 @@ vertical slice (UI → API → provider abstraction → infrastructure) rather
 than a `boto3` wrapper. See `docs/implementation-plan.md` for the full
 design and phase plan.
 
-The React console lives in the sibling [`cloudlab-ui`](../cloudlab-ui)
+The React console lives in the sibling [`cloudLab-ui`](../cloudLab-ui)
 repo.
 
 **Status:** Phases 1–5 and 7 complete — LocalStack, the provider
@@ -72,7 +72,7 @@ curl -X DELETE http://localhost:8000/api/resources/s3/buckets/demo-bucket
 
 Interactive API docs: `http://localhost:8000/docs`.
 
-To run the console against this API, see `cloudlab-ui`'s README
+To run the console against this API, see `cloudLab-ui`'s README
 — its dev server proxies `/api` and `/health` here automatically.
 
 ## Running the API without Docker
@@ -274,11 +274,11 @@ non-default region to actually exercise the conflict-mapping code path.
 DynamoDB `users`/`orders` (both partitioned on `id`).
 
 `verify-all.sh` runs the backend lint/format/type-check/unit/integration
-suite, then the sibling `cloudlab-ui` repo's lint/type-check/
+suite, then the sibling `cloudLab-ui` repo's lint/type-check/
 unit-tests/build, then brings up the real `docker compose` stack and runs
 the Playwright E2E suite against it — the same steps `.github/workflows/ci.yml`
 runs across its two jobs, in one local command. Requires
-`cloudlab-ui` cloned as a sibling directory. Flags:
+`cloudLab-ui` cloned as a sibling directory. Flags:
 `--keep-up` leaves the Docker stack running afterward instead of tearing
 it down; `SKIP_E2E=1 ./scripts/verify-all.sh` skips Docker and Playwright
 entirely (e.g. no Docker on this machine — everything else still runs).
@@ -456,7 +456,7 @@ cloudctl test [--skip-e2e] [--keep-up]         # scripts/verify-all.sh
 
 ## E2E tests
 
-The `cloudlab-ui` repo's `tests/e2e/` (Playwright) drives the
+The `cloudLab-ui` repo's `tests/e2e/` (Playwright) drives the
 real console in a real browser against this API — see that repo's README.
 `scripts/dev-up.sh` above is the fastest way to get this API into the state
 those tests expect.

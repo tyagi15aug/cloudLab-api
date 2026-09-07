@@ -25,7 +25,7 @@ class ProjectNotFoundError(Exception):
 
 
 def find_project_root(start: Path | None = None) -> Path:
-    """Locates the cloudlab-api checkout, identified by
+    """Locates the cloudLab-api checkout, identified by
     `docker-compose.yml` sitting next to a `scripts/` directory — the two
     things every delegated command needs.
 
@@ -50,7 +50,7 @@ def find_project_root(start: Path | None = None) -> Path:
         current = current.parent
 
     raise ProjectNotFoundError(
-        "Couldn't find a cloudlab-api checkout (looking for "
+        "Couldn't find a cloudLab-api checkout (looking for "
         "docker-compose.yml next to a scripts/ directory). Run cloudctl "
         "from inside the repo, or set CLOUDCTL_PROJECT_ROOT."
     )

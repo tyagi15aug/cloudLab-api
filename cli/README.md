@@ -29,7 +29,7 @@ cloudctl test
 ## Install
 
 ```bash
-pip install -e cli/            # from the cloudlab-api repo root
+pip install -e cli/            # from the cloudLab-api repo root
 cloudctl --version
 ```
 
