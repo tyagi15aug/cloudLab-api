@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     api_port: int = 8000
     log_level: str = "INFO"
 
+    # Comma-separated list of allowed origins for the deployed UI, or "*" for
+    # all (fine for local dev / a demo where the API holds no real secrets).
+    cors_allow_origins: str = "*"
+
     # How many times to retry the initial LocalStack connectivity check on
     # startup before giving up, and how long to wait between attempts.
     startup_retry_attempts: int = 10

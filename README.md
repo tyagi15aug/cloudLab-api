@@ -466,3 +466,20 @@ those tests expect.
 `.github/workflows/ci.yml` runs lint, format check, type check, the unit
 test suite (with coverage), the integration test suite, a Docker build,
 and the `cloudctl` CLI's own test suite, on every push/PR to `main`.
+
+## Deploying to Render
+
+`render.yaml` in this repo is a Render Blueprint defining two services: this
+API (Docker, using the repo's own `Dockerfile`) and a LocalStack instance
+it talks to. Both run on Render's Free instance type — LocalStack as a
+plain `type: web` service rather than a private service, since Render's
+free tier doesn't support private services at all (only web services,
+static sites, Postgres, and Key Value are free).
+
+To deploy: Render Dashboard → New → Blueprint → point at this repo. After
+`cloudlab-ui` (separate repo/Blueprint) is deployed, come back and set
+`CORS_ALLOW_ORIGINS` on this service to its real URL instead of `"*"`.
+
+Cold starts (up to ~1 minute after 15 minutes idle) are expected on the
+free plan and not engineered around — see the Master Plan's hosting
+section.

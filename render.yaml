@@ -1,0 +1,61 @@
+# Render Blueprint for CloudLab's backend + its LocalStack AWS emulator.
+# Deploy: Render Dashboard -> New -> Blueprint -> point at this repo.
+#
+# Free-tier note: Render's Free instance type does NOT support private
+# services (only web services, static sites, Postgres, and Key Value do —
+# confirmed against Render's docs, not assumed). LocalStack therefore runs
+# below as a plain `type: web` service, not `pserv`, so it stays free — it
+# gets a public URL as a side effect, which is an acceptable trade-off
+# since it holds no real credentials or data, only fake AWS test resources.
+# If you'd rather it not be publicly reachable, switch it to `type: pserv`
+# and put it on a paid instance type (Starter, ~$7/mo as of this writing).
+#
+# Cold starts on the free plan are expected and accepted (see the Master
+# Plan's hosting section / this repo's Phase 8.5) — not something this
+# file tries to engineer around.
+services:
+  - type: web
+    runtime: image
+    name: cloudlab-localstack
+    image:
+      url: docker.io/localstack/localstack:3.8
+    plan: free
+    envVars:
+      - key: SERVICES
+        value: s3,sqs,dynamodb
+      - key: DEFAULT_REGION
+        value: us-east-1
+      - key: PERSISTENCE
+        value: "0"
+      - key: PORT
+        value: "4566"
+
+  - type: web
+    runtime: docker
+    name: cloudlab-api
+    dockerfilePath: ./Dockerfile
+    # Overrides the Dockerfile's own CMD (which includes --reload, useful
+    # for the docker-compose bind-mount dev flow but not wanted here).
+    dockerCommand: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    plan: free
+    envVars:
+      - key: CLOUD_PROVIDER
+        value: localstack
+      - key: AWS_REGION
+        value: us-east-1
+      - key: AWS_ACCESS_KEY_ID
+        value: test
+      - key: AWS_SECRET_ACCESS_KEY
+        value: test
+      # Render web services are reachable by their `name:` as an internal
+      # hostname over Render's private network, on the port they listen on
+      # (set above) — same pattern docker-compose's `http://localstack:4566`
+      # already used locally, just a different hostname.
+      - key: AWS_ENDPOINT_URL
+        value: http://cloudlab-localstack:4566
+      - key: LOG_LEVEL
+        value: INFO
+      # Tighten this to cloudlab-ui's actual Render URL once you know it —
+      # can't be templated here since the UI is a separate repo/Blueprint.
+      - key: CORS_ALLOW_ORIGINS
+        value: "*"
