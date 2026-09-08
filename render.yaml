@@ -47,12 +47,14 @@ services:
         value: test
       - key: AWS_SECRET_ACCESS_KEY
         value: test
-      # Render web services are reachable by their `name:` as an internal
-      # hostname over Render's private network, on the port they listen on
-      # (set above) — same pattern docker-compose's `http://localstack:4566`
-      # already used locally, just a different hostname.
+      # NOT the internal http://cloudlab-localstack:4566 hostname —
+      # Render's Free instances can send private-network requests but
+      # can't receive them, so cloudlab-localstack (also Free) is
+      # unreachable that way no matter how healthy it is. Its public
+      # HTTPS URL works fine since that's ordinary internet traffic,
+      # not Render's private network.
       - key: AWS_ENDPOINT_URL
-        value: http://cloudlab-localstack:4566
+        value: https://cloudlab-localstack.onrender.com
       - key: LOG_LEVEL
         value: INFO
       # Tighten this to cloudlab-ui's actual Render URL once you know it —
