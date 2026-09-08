@@ -1,18 +1,25 @@
 services:
+  # Was localstack/localstack:3.8. Swapped for MiniStack (MIT, ministack.org)
+  # after LocalStack's ~500MB RAM footprint OOM'd Render's free-tier 512MB
+  # instance in production (see Phase 8 note below) — MiniStack is a
+  # documented drop-in replacement for the services this project uses
+  # (same SERVICES=/port 4566/credential-agnostic conventions, boto3 needs
+  # no changes), at ~30MB idle. Service/container name kept as
+  # "localstack"/"cloudlab-localstack" rather than renamed, since the
+  # deployed API's AWS_ENDPOINT_URL and CORS config reference that name —
+  # see render.yaml.
   localstack:
-    image: localstack/localstack:3.8
+    image: ministackorg/ministack:1.5.9
     container_name: cloudlab-localstack
     ports:
       - "4566:4566"
     environment:
       - SERVICES=s3,sqs,dynamodb
-      - DEBUG=0
       - DEFAULT_REGION=us-east-1
-      - PERSISTENCE=0
-    volumes:
-      - localstack_data:/var/lib/localstack
-      - /var/run/docker.sock:/var/run/docker.sock
     healthcheck:
+      # MiniStack answers its own /_ministack/health, but also serves
+      # /_localstack/health for drop-in compatibility with tooling (like
+      # this healthcheck) written against LocalStack's API surface.
       test:
         [
           "CMD",
@@ -43,6 +50,3 @@ services:
     depends_on:
       localstack:
         condition: service_healthy
-
-volumes:
-  localstack_data:

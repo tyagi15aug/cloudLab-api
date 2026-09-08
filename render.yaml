@@ -1,9 +1,20 @@
-# Render Blueprint for CloudLab's backend + its LocalStack AWS emulator.
+# Render Blueprint for CloudLab's backend + its AWS emulator.
 # Deploy: Render Dashboard -> New -> Blueprint -> point at this repo.
+#
+# The emulator service below is still named/hostnamed "cloudlab-localstack"
+# (kept deliberately — see the swap note just below it) but as of this
+# change actually runs MiniStack (ministack.org, MIT), not LocalStack.
+# LocalStack's ~500MB RAM footprint was OOM-killing this service on Render's
+# free-tier 512MB instance, which surfaced as the SPA's cold-start splash
+# ("Starting LocalStack...") spinning forever even once the API itself was
+# up. MiniStack is a documented drop-in for the services this project uses
+# (same SERVICES=/port 4566 conventions, boto3 needs no code changes) at
+# ~30MB idle — comfortably inside the free tier's memory limit instead of
+# right at its edge.
 #
 # Free-tier note: Render's Free instance type does NOT support private
 # services (only web services, static sites, Postgres, and Key Value do —
-# confirmed against Render's docs, not assumed). LocalStack therefore runs
+# confirmed against Render's docs, not assumed). The emulator therefore runs
 # below as a plain `type: web` service, not `pserv`, so it stays free — it
 # gets a public URL as a side effect, which is an acceptable trade-off
 # since it holds no real credentials or data, only fake AWS test resources.
@@ -16,17 +27,20 @@
 services:
   - type: web
     runtime: image
+    # Name kept as "cloudlab-localstack" rather than renamed to
+    # "cloudlab-ministack" — renaming a Render Blueprint service changes its
+    # public hostname, which would break cloudlab-api's AWS_ENDPOINT_URL
+    # below and force a new service (losing this one's history/URL) rather
+    # than an in-place swap. The image is what actually changed.
     name: cloudlab-localstack
     image:
-      url: docker.io/localstack/localstack:3.8
+      url: docker.io/ministackorg/ministack:1.5.9
     plan: free
     envVars:
       - key: SERVICES
         value: s3,sqs,dynamodb
       - key: DEFAULT_REGION
         value: us-east-1
-      - key: PERSISTENCE
-        value: "0"
       - key: PORT
         value: "4566"
 
