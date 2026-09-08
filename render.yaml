@@ -58,4 +58,4 @@ services:
       # Tighten this to cloudlab-ui's actual Render URL once you know it —
       # can't be templated here since the UI is a separate repo/Blueprint.
       - key: CORS_ALLOW_ORIGINS
-        value: "*"
+        value: "https://cloudlab-ui.onrender.com"
