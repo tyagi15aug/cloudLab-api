@@ -56,11 +56,21 @@ def _probe_localstack(provider) -> str:
     from under them). The probe thread is abandoned (not cancelled) if it
     times out — `shutdown(wait=False)` so this endpoint doesn't itself hang
     waiting for a slow socket to give up.
+
+    Bound was 3s; bumped to 10s after watching a real cold start on Render
+    (MiniStack, post-Phase-8.6) take ~7-9s from container boot to "Ready" --
+    a 3s budget meant every single cold start showed several bare
+    TimeoutErrors (empty `str(exc)`, logged as "not yet reachable: " with
+    nothing after the colon) before the emulator had a real chance to
+    answer. This doesn't fix a hibernating emulator that never wakes at all
+    (that's Render's job, nudged from the frontend -- see
+    src/api/readiness.ts) -- it just stops a *successfully* waking one from
+    reading as failed while it's still finishing its very fast boot.
     """
     pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     future = pool.submit(lambda: provider.get_client("s3").list_buckets())
     try:
-        future.result(timeout=3)
+        future.result(timeout=10)
         return "ready"
     except Exception as exc:  # noqa: BLE001 - readiness probe, deliberately broad
         logger.info("Readiness check: provider not yet reachable: %s", exc)
